@@ -337,7 +337,7 @@ class CommunityModel:
         if d.battery_final_soc_kWh is not None:
             m.addConstr(self.var["soc"][i][d.n_hours - 1] == d.battery_final_soc_kWh, name=f"final_soc_{i}")
 
-    def _add_contract_constraints(self) -> None:
+    def _add_contract_constraints(self) -> None: # Needs to have share of the contract capacity limit for each member in the individual contract case and the non negative constraint for the excedance variable.
         if self.mode is ContractMode.NONE:
             return
         caps = self.data.contract.individual_capacity_limit_kW
@@ -357,8 +357,8 @@ class CommunityModel:
             for t in self.T:
                 terms.append(
                     d.pv_marginal_cost * self._member_var("pv", i, t)
-                    + beta * (p[t] + d.import_tariff) * self.var["import"][i, t]
-                    - beta * (p[t] - d.export_tariff) * self.var["export"][i, t]
+                    + (p[t] + d.import_tariff*(1-beta)) * self.var["import"][i, t] 
+                    - (p[t] - d.export_tariff*(1-beta)) * self.var["export"][i, t]
                     + d.linear_disutility * self.var["deviation"][i, t]
                 )
                 if self.mode is ContractMode.INDIVIDUAL:
