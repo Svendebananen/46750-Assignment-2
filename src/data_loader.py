@@ -93,6 +93,7 @@ class InputData:
     battery_discharging_efficiency: float | None = None   # fraction of discharged energy reaching the consumer
     battery_initial_soc_kWh: float | None = None          # state of charge at the start of the day
     battery_final_soc_kWh: float | None = None            # None ON PURPOSE: the end-of-horizon treatment is your choice
+    battery_end_soc_value_DKK_per_kWh: float | None = None  # economic value of ending with stored energy
 
     # Next-day values (the following day of the week; for the end-of-horizon choice)
     energy_price_next_day: np.ndarray | None = None       # DKK/kWh, 24 values for the following day
@@ -335,6 +336,9 @@ def _member(consumer: dict, catalogue: dict, bus: dict, next_day: dict | None, c
             battery_charging_efficiency=float(bat["charging_efficiency"]),
             battery_discharging_efficiency=float(bat["discharging_efficiency"]),
             battery_initial_soc_kWh=cap * float(bat["initial_state_of_charge_ratio"]),
+            battery_end_soc_value_DKK_per_kWh=_opt_float(
+                bat, "battery_end_soc_value_DKK_per_kWh"
+            ),
         )
 
     # --- next day (the following day of the week), for the end-of-horizon choice

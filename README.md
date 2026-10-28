@@ -77,11 +77,28 @@ results/                       Written by your code (git-ignored)
 requirements.txt, environment.yaml, .gitignore
 ```
 
-No model code is shipped. Your Assignment 1 code base - the `FlexibleConsumerModel` built on `InputData`,
-your scenario helpers and your plotting - is the natural starting point: every member of the community
-*is* an Assignment 1 consumer, loaded into the same `InputData` class (Section 4). Build the community
-models of the assignment (R, I, C, DP, ...) as one parametrized class with switches rather than as copies,
-and the variations of the base case (Section 4.3) as named configurations.
+The model in `src/model.py` uses the Assignment 1 `InputData` for every member. `CommunityModel`
+is indexed by member and hour and uses `ContractMode.NONE` for the reference case R and
+`ContractMode.INDIVIDUAL` for model I. The `COMMUNITY` mode is reserved for the later community-contract
+implementation and currently raises an explicit `NotImplementedError`.
+
+Run the implemented cases with:
+
+```bash
+python main.py --R
+python main.py --I
+```
+
+Battery models use the explicit `battery_end_soc_value_DKK_per_kWh` parameter, the economic value of
+energy remaining in the battery at the end of the horizon. The command-line override is:
+
+```bash
+python main.py --R --battery-end-value 0.25
+```
+
+The model creates PV and battery variables only for members that own those assets. The linear absolute
+deviation from each member's reference profile remains in the objective; the old quadratic disutility
+formulation is not used.
 
 ## 3. How to use the code
 

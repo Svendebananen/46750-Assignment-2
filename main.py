@@ -5,9 +5,10 @@
     python main.py --day d4                          # another day of the week (and that day's cap)
     python main.py --members                         # also print every member's Assignment 1 summary
     python main.py --demo                            # also run the scenario-generation demonstration (Question 3)
+    python main.py --R                               # solve the 16-member reference case
+    python main.py --I                               # solve the 16-member individual-contract case
 
-No model is provided: build your Assignment 1 model class on the ``InputData`` of each member, then the community
-models of the assignment (R, I, C, DP, ...) on top of it, one function per experiment, writing to ``results/``.
+The R and I model runs are implemented in ``src.model`` and write their results to ``results/``.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ import argparse
 from pathlib import Path
 
 from src.data_loader import load_community, list_communities
+from src.model import CommunityModel, ContractMode
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -25,6 +27,10 @@ def main() -> None:
     ap.add_argument("--day", default="d1", help="d1 (base case) ... d7")
     ap.add_argument("--members", action="store_true", help="print the Assignment 1 summary of every member")
     ap.add_argument("--demo", action="store_true", help="run the scenario-generation demonstration")
+    ap.add_argument("--R", action="store_true", help="run the 16-member reference case without a contract")
+    ap.add_argument("--I", action="store_true", help="run the 16-member individual-contract case")
+    ap.add_argument("--battery-end-value", type=float, default=0.0,
+                    help="economic value in DKK/kWh of battery energy at the end of the day")
     args = ap.parse_args()
 
     com = load_community(args.community, day=args.day)
@@ -40,6 +46,15 @@ def main() -> None:
     if args.demo:
         import runpy
         runpy.run_module("src.scenario_generation", run_name="__main__")
+    if args.R or args.I:
+        mode = ContractMode.INDIVIDUAL if args.I else ContractMode.NONE
+        result = CommunityModel(
+            com,
+            contract_mode=mode,
+            battery_end_soc_value_DKK_per_kWh=args.battery_end_value,
+        ).build().solve()
+        print(result)
+        result.save(RESULTS_DIR / args.community, tag=mode.value)
 
 
 if __name__ == "__main__":
