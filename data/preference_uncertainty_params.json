@@ -1,0 +1,43 @@
+{
+  "description": "Question 3: uncertainty of the community manager about the members' preference parameters when it sets the prices. Two quantities per member can be uncertain, each through one scaling parameter theta drawn from a scaled Beta distribution: the reference profile (the base study, U2) and the disutility slope c^L (a variation, U1). The daily minimum is not a separate uncertain quantity: in every scenario it equals the scenario's daily reference energy. Scenarios are drawn independently per quantity and per member and merged into joint scenarios of the community (src/scenario_generation.py). The manager knows the distributions (these hyper-parameters), not the draws.",
+  "family": "theta ~ lo + (hi - lo) x Beta(a, b) with a = kappa (mean - lo)/(hi - lo), b = kappa - a. Bounds lo, hi are hard (never violated, no clipping); mean = where the scenarios are centred (1 = the base case); kappa = concentration: Var theta = (hi - lo)^2 mu (1 - mu)/(kappa + 1) with mu = (mean - lo)/(hi - lo); kappa -> infinity is deterministic, kappa = 2 with the mean centred is Uniform(lo, hi), kappa < 2 is U-shaped. n_scenarios = 1 means the quantity is not uncertain: its single scenario is the base value (theta = 1) for every member.",
+  "quantities": {
+    "profile": {
+      "applies_to": "reference_load_capacity_factor rho_t",
+      "rule": "rho_t ^ theta, one theta per member for all 24 hours",
+      "n_scenarios": 5,
+      "lo": 0.8,
+      "hi": 1.2,
+      "mean": 1.0,
+      "kappa": 2.0,
+      "note": "the base study (U2). A power keeps 0 and 1 fixed and the profile inside [0, 1] without clipping; theta < 1 raises the profile (more energy), theta > 1 lowers it. The daily minimum follows: min_total_energy_per_day_kWh = max_load x sum_t rho_t^theta in every scenario."
+    },
+    "cL": {
+      "applies_to": "linear_disutility_DKK_per_kWh",
+      "rule": "value x theta",
+      "n_scenarios": 1,
+      "lo": 0.6,
+      "hi": 1.4,
+      "mean": 1.0,
+      "kappa": 2.0,
+      "note": "a variation (U1): how flexible the member really is; the ordering of the slopes is kept. Not uncertain in the base study (n_scenarios = 1). With n_scenarios > 1 and these values theta ~ Uniform(0.6, 1.4)."
+    }
+  },
+  "daily_minimum_rule": "min_total_energy_per_day_kWh = max_load_KWh_per_hour x sum_t (scenario reference_load_capacity_factor)_t, in every scenario (deterministic given the profile)",
+  "per_consumer": {},
+  "merging": {
+    "mode": "aligned",
+    "rule": "joint scenario s takes scenario s of every uncertain (quantity, member) pair; the same n_scenarios for all uncertain pairs",
+    "note": "every joint scenario records the index it took from each (quantity, member) and the theta values"
+  },
+  "scenarios": {
+    "in_sample_sizes_to_study": [
+      5,
+      10
+    ],
+    "in_sample_draws_per_size": 1,
+    "out_of_sample_draws": 100,
+    "seeds": "Report every seed; use the same out-of-sample draws for every model (common random numbers).",
+    "note": "The deterministic baseline uses the base parameters (theta = 1 everywhere), which is also the mean of every distribution in the base study."
+  }
+}

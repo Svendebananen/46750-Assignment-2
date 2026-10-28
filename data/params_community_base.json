@@ -1,0 +1,135 @@
+{
+  "community_id": "EC_base",
+  "description": "Base-case energy community: 16 small members composed from appliance_params.json, one per combination of a flexible load FL_L1-FL_L4 (linear disutility 0.25 / 0.5 / 1.0 / 2.0 DKK/kWh of deviation from the reference profile; at most 1 kWh of deviation per hour within 0-3 kWh/h; daily minimum equal to the daily reference energy) and an asset class: no asset (C<k>), PV (C<k>_PV), battery (C<k>_B), PV and battery (C<k>_PVB). connection_bus is the bus of bus_params.json: the community's single connection point, shared by all members.",
+  "consumers": [
+    {
+      "consumer_id": "C1",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L1"
+      ]
+    },
+    {
+      "consumer_id": "C1_PV",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L1"
+      ]
+    },
+    {
+      "consumer_id": "C1_B",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L1",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C1_PVB",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L1",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C2",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L2"
+      ]
+    },
+    {
+      "consumer_id": "C2_PV",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L2"
+      ]
+    },
+    {
+      "consumer_id": "C2_B",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L2",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C2_PVB",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L2",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C3",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L3"
+      ]
+    },
+    {
+      "consumer_id": "C3_PV",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L3"
+      ]
+    },
+    {
+      "consumer_id": "C3_B",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L3",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C3_PVB",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L3",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C4",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L4"
+      ]
+    },
+    {
+      "consumer_id": "C4_PV",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L4"
+      ]
+    },
+    {
+      "consumer_id": "C4_B",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "FL_L4",
+        "BAT_01_S"
+      ]
+    },
+    {
+      "consumer_id": "C4_PVB",
+      "connection_bus": "Bus1",
+      "list_appliances": [
+        "PV_01_S",
+        "FL_L4",
+        "BAT_01_S"
+      ]
+    }
+  ],
+  "hyperparameters": null
+}
