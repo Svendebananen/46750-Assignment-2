@@ -367,18 +367,6 @@ class _CommunityModelBase:
         if d.battery_final_soc_kWh is not None:
             m.addConstr(self.var["soc"][i][d.n_hours - 1] == d.battery_final_soc_kWh, name=f"final_soc_{i}")
 
-    def _member_cost(self, i: int, t: int, import_tariff: float, export_tariff: float):
-        d = self.members[i]
-        p = self.data.energy_price[t]
-        if d.linear_disutility is None:
-            raise ValueError(f"{d.question} does not define linear_disutility.")
-        return (
-            d.pv_marginal_cost * self._member_var("pv", i, t)
-            + (p + import_tariff) * self.var["import"][i, t]
-            - (p - export_tariff) * self.var["export"][i, t]
-            + d.linear_disutility * self.var["deviation"][i, t]
-        )
-
     def _battery_terminal_value(self):
         return gp.quicksum(
             -self.terminal_value * self.var["soc"][i][self.members[i].n_hours - 1]
@@ -426,14 +414,20 @@ class NoContractCommunityModel(_CommunityModelBase):
     mode = ContractMode.NONE
 
     def _objective(self):
-        return (
-            gp.quicksum(
-                self._member_cost(i, t, self.members[i].import_tariff, self.members[i].export_tariff)
-                for i in self.I
-                for t in self.T
-            )
-            + self._battery_terminal_value()
-        )
+        terms = []
+        for i, member in enumerate(self.members):
+            if member.linear_disutility is None:
+                raise ValueError(f"{member.question} does not define linear_disutility.")
+            for t in self.T:
+                terms.append(
+                    member.pv_marginal_cost * self._member_var("pv", i, t)
+                    + (self.data.energy_price[t] + member.import_tariff)
+                    * self.var["import"][i, t]
+                    - (self.data.energy_price[t] - member.export_tariff)
+                    * self.var["export"][i, t]
+                    + member.linear_disutility * self.var["deviation"][i, t]
+                )
+        return gp.quicksum(terms) + self._battery_terminal_value()
 
 
 class IndividualContractCommunityModel(_CommunityModelBase):
@@ -459,21 +453,24 @@ class IndividualContractCommunityModel(_CommunityModelBase):
 
     def _objective(self):
         c = self.data.contract
-        tariff_factor = 1.0 - c.tariff_discount_ratio
-        return (
-            gp.quicksum(
-                self._member_cost(
-                    i,
-                    t,
-                    self.members[i].import_tariff * tariff_factor,
-                    self.members[i].export_tariff * tariff_factor,
+        beta = c.tariff_discount_ratio
+        alpha = c.penalty_DKK_per_kWh
+        terms = []
+        for i, member in enumerate(self.members):
+            if member.linear_disutility is None:
+                raise ValueError(f"{member.question} does not define linear_disutility.")
+            for t in self.T:
+                terms.append(
+                    member.pv_marginal_cost * self._member_var("pv", i, t)
+                    + (self.data.energy_price[t] + (1.0 - beta) * member.import_tariff)
+                    * self.var["import"][i, t]
+                    - (self.data.energy_price[t] - (1.0 - beta) * member.export_tariff)
+                    * self.var["export"][i, t]
+                    + (alpha + beta * member.import_tariff)
+                    * self.var["excess"][i, t]
+                    + member.linear_disutility * self.var["deviation"][i, t]
                 )
-                + c.penalty_DKK_per_kWh * self.var["excess"][i, t]
-                for i in self.I
-                for t in self.T
-            )
-            + self._battery_terminal_value()
-        )
+        return gp.quicksum(terms) + self._battery_terminal_value()
 
 
 class CommunityContractCommunityModel(_CommunityModelBase):
@@ -504,18 +501,23 @@ class CommunityContractCommunityModel(_CommunityModelBase):
 
     def _objective(self):
         c = self.data.contract
-        tariff_factor = 1.0 - c.tariff_discount_ratio
-        member_terms = gp.quicksum(
-            self._member_cost(i, t, 0.0, 0.0)
-            for i in self.I
-            for t in self.T
-        )
+        beta = c.tariff_discount_ratio
+        alpha = c.penalty_DKK_per_kWh
+        member_terms = []
+        for i, member in enumerate(self.members):
+            if member.linear_disutility is None:
+                raise ValueError(f"{member.question} does not define linear_disutility.")
+            for t in self.T:
+                member_terms.append(
+                    member.pv_marginal_cost * self._member_var("pv", i, t)
+                    + member.linear_disutility * self.var["deviation"][i, t]
+                )
         meter_terms = gp.quicksum(
-            (self.data.energy_price[t] + self.members[0].import_tariff * tariff_factor)
+            (self.data.energy_price[t] + (1.0 - beta) * self.members[0].import_tariff)
             * self.var["community_import"][t]
-            - (self.data.energy_price[t] - self.members[0].export_tariff * tariff_factor)
+            - (self.data.energy_price[t] - (1.0 - beta) * self.members[0].export_tariff)
             * self.var["community_export"][t]
-            + c.penalty_DKK_per_kWh * self.var["excess"][t]
+            + alpha * self.var["excess"][t]
             for t in self.T
         )
-        return member_terms + meter_terms + self._battery_terminal_value()
+        return gp.quicksum(member_terms) + meter_terms + self._battery_terminal_value()
