@@ -79,8 +79,9 @@ requirements.txt, environment.yaml, .gitignore
 
 The model in `src/model.py` uses the Assignment 1 `InputData` for every member. `CommunityModel`
 is indexed by member and hour and uses `ContractMode.NONE` for the reference case R and
-`ContractMode.INDIVIDUAL` for model I. The `COMMUNITY` mode is reserved for the later community-contract
-implementation and currently raises an explicit `NotImplementedError`.
+`ContractMode.INDIVIDUAL` for model I. The three contract modes are implemented as separate
+community-model classes behind the same `CommunityModel` construction API; `ContractMode.COMMUNITY`
+uses one discounted contract at the shared meter.
 
 Run the implemented cases with:
 
