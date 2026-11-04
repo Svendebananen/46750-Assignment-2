@@ -18,6 +18,7 @@ from pathlib import Path
 
 from src.data_loader import load_community, list_communities
 from src.model import CommunityModel, ContractMode
+from src.plotting import plot_results
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -63,6 +64,10 @@ def main() -> None:
         ).build().solve()
         print(result)
         result.save(RESULTS_DIR / args.community, tag=mode.value)
+        plot_paths = plot_results(result, com.contract, RESULTS_DIR / args.community)
+        print("Plots written:")
+        for path in plot_paths:
+            print(f"  {path}")
 
 
 if __name__ == "__main__":
