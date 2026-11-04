@@ -96,13 +96,13 @@ def plot_results(
     return [dispatch_path, contract_path]
 
 
-def plot_member_benefits(
+def plot_member_operating_Costs(
     reference: "Results",
     contract_result: "Results",
     members: list,
     output_dir: Path | str,
 ) -> Path:
-    """Plot each contract's operating-cost benefit, stacked by member and asset type."""
+    """Plot each contract's operating-cost compared to the reference, stacked by member and asset type."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     asset_types = ("No asset", "PV", "Battery", "PV and battery")
@@ -130,32 +130,84 @@ def plot_member_benefits(
     fig, ax = plt.subplots(figsize=(10, 6))
     bottoms = np.zeros(len(asset_types))
     for member in members:
-        benefits = np.array([
+        operating_Costs = np.array([
             reference_costs[member.consumer_id] - contract_costs[member.consumer_id]
             if member.consumer_id in asset_member_ids[asset_type] else 0.0
             for asset_type in asset_types
         ])
-        if not np.any(benefits):
+        if not np.any(operating_Costs):
             continue
         ax.bar(
             positions,
-            benefits,
+            operating_Costs,
             width,
             bottom=bottoms,
             label=member.consumer_id,
         )
-        bottoms += benefits
+        bottoms += operating_Costs
     ax.axhline(0, color="black", linewidth=0.8)
     ax.set(
-        title=f"{mode.upper()} contract: operating-cost benefit by asset type",
-        ylabel="Benefit versus reference R (DKK/member)",
+        title=f"{mode.upper()} contract: operating-cost comparison to reference R",
+        ylabel="Operating cost versus reference R (DKK/member)",
         xticks=positions,
         xticklabels=asset_types,
     )
     ax.grid(axis="y", alpha=0.25)
     ax.legend(title="Member", ncol=2)
     fig.tight_layout()
-    path = output_dir / f"{contract_result.question}_member_benefits.png"
+    path = output_dir / f"{contract_result.question}_member_operating_Costs.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
+
+
+def plot_member_profits(
+    result: "Results",
+    members: list,
+    output_dir: Path | str,
+) -> Path:
+    """Plot each member's full-day profit, stacked by member and asset type."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    asset_types = ("No asset", "PV", "Battery", "PV and battery")
+    asset_member_ids = {
+        asset_type: {
+            member.consumer_id for member in members
+            if (
+                asset_type == "No asset" and not member.has_pv and not member.has_battery
+                or asset_type == "PV" and member.has_pv and not member.has_battery
+                or asset_type == "Battery" and not member.has_pv and member.has_battery
+                or asset_type == "PV and battery" and member.has_pv and member.has_battery
+            )
+        }
+        for asset_type in asset_types
+    }
+    profits = result.meta["member_profits"]
+    positions = np.arange(len(asset_types))
+    bottoms = np.zeros(len(asset_types))
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for member in members:
+        values = np.array([
+            profits[member.consumer_id]
+            if member.consumer_id in asset_member_ids[asset_type] else 0.0
+            for asset_type in asset_types
+        ])
+        if not np.any(values):
+            continue
+        ax.bar(positions, values, 0.65, bottom=bottoms, label=member.consumer_id)
+        bottoms += values
+    ax.axhline(0, color="black", linewidth=0.8)
+    mode = result.meta["contract_mode"]
+    ax.set(
+        title=f"{mode.upper()} contract: member profit by asset type",
+        ylabel="Profit (DKK/day)",
+        xticks=positions,
+        xticklabels=asset_types,
+    )
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(title="Member", ncol=2)
+    fig.tight_layout()
+    path = output_dir / f"{result.question}_member_profits.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path

@@ -18,7 +18,7 @@ from pathlib import Path
 
 from src.data_loader import load_community, list_communities
 from src.model import CommunityModel, ContractMode
-from src.plotting import plot_member_benefits, plot_results
+from src.plotting import plot_member_operating_Costs, plot_member_profits, plot_results
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -74,13 +74,19 @@ def main() -> None:
                 contract_mode=ContractMode.NONE,
                 battery_end_soc_value_DKK_per_kWh=args.battery_end_value,
             ).build().solve()
-            benefit_path = plot_member_benefits(
+            benefit_path = plot_member_operating_Costs(
                 reference,
                 result,
                 com.members,
                 RESULTS_DIR / args.community,
             )
             print(f"  {benefit_path}")
+            profit_path = plot_member_profits(
+                result,
+                com.members,
+                RESULTS_DIR / args.community,
+            )
+            print(f"  {profit_path}")
 
 
 if __name__ == "__main__":
