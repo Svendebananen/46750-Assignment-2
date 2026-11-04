@@ -443,12 +443,18 @@ class IndividualContractCommunityModel(_CommunityModelBase):
         caps = self.data.contract.individual_capacity_limit_kW
         self.con["excess"] = self.m.addConstrs(
             (
-                self.var["excess"][i, t]
-                >= self.var["import"][i, t] - caps[self.members[i].consumer_id][t]
+                self.var["import"][i, t]
+                - caps[self.members[i].consumer_id][t] 
+                - self.var["excess"][i, t]
+                <= 0
                 for i in self.I
                 for t in self.T
             ),
             name="excess",
+        )
+        self.con["excess_nonnegative"] = self.m.addConstrs(
+            (-self.var["excess"][i, t] <= 0 for i in self.I for t in self.T),
+            name="excess_nonnegative",
         )
 
     def _objective(self):
