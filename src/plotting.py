@@ -94,3 +94,68 @@ def plot_results(
     plt.close(fig)
 
     return [dispatch_path, contract_path]
+
+
+def plot_member_benefits(
+    reference: "Results",
+    contract_result: "Results",
+    members: list,
+    output_dir: Path | str,
+) -> Path:
+    """Plot each contract's operating-cost benefit, stacked by member and asset type."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    asset_types = ("No asset", "PV", "Battery", "PV and battery")
+    asset_members = {
+        asset_type: [
+            member for member in members
+            if (
+                asset_type == "No asset" and not member.has_pv and not member.has_battery
+                or asset_type == "PV" and member.has_pv and not member.has_battery
+                or asset_type == "Battery" and not member.has_pv and member.has_battery
+                or asset_type == "PV and battery" and member.has_pv and member.has_battery
+            )
+        ]
+        for asset_type in asset_types
+    }
+    reference_costs = reference.meta["member_operating_costs"]
+    contract_costs = contract_result.meta["member_operating_costs"]
+    mode = contract_result.meta["contract_mode"]
+    asset_member_ids = {
+        asset_type: {member.consumer_id for member in asset_members[asset_type]}
+        for asset_type in asset_types
+    }
+    positions = np.arange(len(asset_types))
+    width = 0.65
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bottoms = np.zeros(len(asset_types))
+    for member in members:
+        benefits = np.array([
+            reference_costs[member.consumer_id] - contract_costs[member.consumer_id]
+            if member.consumer_id in asset_member_ids[asset_type] else 0.0
+            for asset_type in asset_types
+        ])
+        if not np.any(benefits):
+            continue
+        ax.bar(
+            positions,
+            benefits,
+            width,
+            bottom=bottoms,
+            label=member.consumer_id,
+        )
+        bottoms += benefits
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set(
+        title=f"{mode.upper()} contract: operating-cost benefit by asset type",
+        ylabel="Benefit versus reference R (DKK/member)",
+        xticks=positions,
+        xticklabels=asset_types,
+    )
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(title="Member", ncol=2)
+    fig.tight_layout()
+    path = output_dir / f"{contract_result.question}_member_benefits.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path

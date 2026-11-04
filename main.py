@@ -18,7 +18,7 @@ from pathlib import Path
 
 from src.data_loader import load_community, list_communities
 from src.model import CommunityModel, ContractMode
-from src.plotting import plot_results
+from src.plotting import plot_member_benefits, plot_results
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
@@ -68,6 +68,19 @@ def main() -> None:
         print("Plots written:")
         for path in plot_paths:
             print(f"  {path}")
+        if mode != ContractMode.NONE:
+            reference = CommunityModel(
+                com,
+                contract_mode=ContractMode.NONE,
+                battery_end_soc_value_DKK_per_kWh=args.battery_end_value,
+            ).build().solve()
+            benefit_path = plot_member_benefits(
+                reference,
+                result,
+                com.members,
+                RESULTS_DIR / args.community,
+            )
+            print(f"  {benefit_path}")
 
 
 if __name__ == "__main__":

@@ -401,8 +401,59 @@ class _CommunityModelBase:
             status=status,
             objective=self.m.ObjVal,
             hourly=hourly,
-            meta={"members": len(self.members), "contract_mode": self.mode.value},
+            meta={
+                "members": len(self.members),
+                "contract_mode": self.mode.value,
+                "member_operating_costs": self._member_operating_costs(),
+            },
         )
+
+    def _member_operating_costs(self) -> dict[str, float]:
+        costs: dict[str, float] = {}
+        beta = self.data.contract.tariff_discount_ratio if self.mode != ContractMode.NONE else 0.0
+        alpha = self.data.contract.penalty_DKK_per_kWh
+        for i, member in enumerate(self.members):
+            cost = 0.0
+            for t in self.T:
+                pv = self._member_var("pv", i, t)
+                pv_value = pv.X if hasattr(pv, "X") else 0.0
+                deviation = self.var["deviation"][i, t].X
+                if self.mode == ContractMode.COMMUNITY:
+                    net = self.var["net_consumption"][i, t].X
+                    member_import = max(net, 0.0)
+                    member_export = max(-net, 0.0)
+                    excess = 0.0
+                else:
+                    member_import = self.var["import"][i, t].X
+                    member_export = self.var["export"][i, t].X
+                    excess_var = self.var.get("excess", {}).get((i, t), 0.0)
+                    excess = excess_var.X if hasattr(excess_var, "X") else 0.0
+                cost += (
+                    member.pv_marginal_cost * pv_value
+                    + (self.data.energy_price[t] + (1.0 - beta) * member.import_tariff) * member_import
+                    - (self.data.energy_price[t] - (1.0 - beta) * member.export_tariff) * member_export
+                    + (alpha + beta * member.import_tariff) * excess
+                    + member.linear_disutility * deviation
+                )
+            costs[member.consumer_id] = float(cost)
+        if self.mode == ContractMode.COMMUNITY:
+            total_excess = sum(
+                max(self.var["community_import"][t].X - self.data.contract.capacity_limit_kW[t], 0.0)
+                for t in self.T
+            )
+            positive_net = {
+                member.consumer_id: sum(
+                    max(self.var["net_consumption"][i, t].X, 0.0) for t in self.T
+                )
+                for i, member in enumerate(self.members)
+            }
+            total_positive_net = sum(positive_net.values())
+            if total_positive_net > 0:
+                for consumer_id in costs:
+                    costs[consumer_id] += (
+                        alpha + beta * self.members[0].import_tariff
+                    ) * total_excess * positive_net[consumer_id] / total_positive_net
+        return costs
 
     def solve(self) -> Results:
         self.m.optimize()
@@ -549,7 +600,11 @@ class CommunityContractCommunityModel(_CommunityModelBase):
             status=status,
             objective=self.m.ObjVal,
             hourly=hourly,
-            meta={"members": len(self.members), "contract_mode": self.mode.value},
+            meta={
+                "members": len(self.members),
+                "contract_mode": self.mode.value,
+                "member_operating_costs": self._member_operating_costs(),
+            },
         )
 
     def _objective(self):

@@ -97,6 +97,8 @@ Each model run also prints its objective and daily energy totals and writes two 
 - `<mode>_dispatch.png` compares community load, PV generation, grid import, and export over the day.
 - `<mode>_contract.png` compares grid import with the DSO capacity limit. For `R`, the figure shows the
   unconstrained reference import; for `I` and `C`, import above the cap is highlighted.
+- `<mode>_member_benefits.png` (for `I` and `C`) stacks each member's operating-cost benefit versus `R`
+  within the four asset groups: no asset, PV, battery, and PV plus battery.
 
 In model `C`, the DSO centrally dispatches every member's flexible load, PV, and battery. Member net
 consumption is settled internally; only aggregate community import and export are exchanged through the
