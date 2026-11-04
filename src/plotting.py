@@ -15,7 +15,12 @@ if TYPE_CHECKING:
     from .model import Results
 
 
-def plot_results(result: "Results", contract: "ContractData", output_dir: Path | str) -> list[Path]:
+def plot_results(
+    result: "Results",
+    contract: "ContractData",
+    energy_price: np.ndarray,
+    output_dir: Path | str,
+) -> list[Path]:
     """Save dispatch and contract-capacity figures for one model result."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -33,7 +38,7 @@ def plot_results(result: "Results", contract: "ContractData", output_dir: Path |
     ax.plot(hours, hourly["import"], label="Grid import", linewidth=2)
     ax.plot(hours, hourly["export"], label="Grid export", linewidth=2)
     ax.set(
-        title=f"{title_mode}: community energy dispatch",
+        title=f"{title_mode}: Accumulated community energy dispatch",
         xlabel="Hour of day",
         ylabel="Energy (kWh)",
         xticks=hours,
@@ -70,7 +75,20 @@ def plot_results(result: "Results", contract: "ContractData", output_dir: Path |
         xticks=hours,
     )
     ax.grid(True, alpha=0.25)
-    ax.legend()
+    handles, labels = ax.get_legend_handles_labels()
+    price_ax = ax.twinx()
+    price_line, = price_ax.plot(
+        hours,
+        energy_price,
+        color="tab:purple",
+        linewidth=2,
+        label="Day-ahead price",
+    )
+    price_ax.set_ylabel("Day-ahead price (DKK/kWh)", color="tab:purple")
+    price_ax.tick_params(axis="y", labelcolor="tab:purple")
+    handles.append(price_line)
+    labels.append("Day-ahead price")
+    ax.legend(handles, labels)
     fig.tight_layout()
     fig.savefig(contract_path, dpi=160)
     plt.close(fig)

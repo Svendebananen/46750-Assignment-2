@@ -64,7 +64,7 @@ def main() -> None:
         ).build().solve()
         print(result)
         result.save(RESULTS_DIR / args.community, tag=mode.value)
-        plot_paths = plot_results(result, com.contract, RESULTS_DIR / args.community)
+        plot_paths = plot_results(result, com.contract, com.energy_price, RESULTS_DIR / args.community)
         print("Plots written:")
         for path in plot_paths:
             print(f"  {path}")
