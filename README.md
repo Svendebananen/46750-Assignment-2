@@ -81,14 +81,19 @@ The model in `src/model.py` uses the Assignment 1 `InputData` for every member. 
 is indexed by member and hour and uses `ContractMode.NONE` for the reference case R and
 `ContractMode.INDIVIDUAL` for model I. The three contract modes are implemented as separate
 community-model classes behind the same `CommunityModel` construction API; `ContractMode.COMMUNITY`
-uses one discounted contract at the shared meter.
+uses one discounted contract at the shared meter with centralized DSO dispatch.
 
 Run the implemented cases with:
 
 ```bash
 python main.py --R
 python main.py --I
+python main.py --C
 ```
+
+In model `C`, the DSO centrally dispatches every member's flexible load, PV, and battery. Member net
+consumption is settled internally; only aggregate community import and export are exchanged through the
+shared meter. Community import is subject to the DSO capacity limit and the soft-cap penalty.
 
 Battery models use the explicit `battery_end_soc_value_DKK_per_kWh` parameter, the economic value of
 energy remaining in the battery at the end of the horizon. The command-line override is:

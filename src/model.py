@@ -279,8 +279,6 @@ class _CommunityModelBase:
 
     def _add_variables(self) -> None:
         m = self.m
-        self.var["import"] = m.addVars(self.I, self.T, lb=0, name="import")
-        self.var["export"] = m.addVars(self.I, self.T, lb=0, name="export")
         self.var["load"] = m.addVars(self.I, self.T, lb=0, name="load")
         self.var["deviation"] = m.addVars(self.I, self.T, lb=0, name="deviation")
         for i, member in enumerate(self.members):
@@ -289,9 +287,11 @@ class _CommunityModelBase:
             if member.has_battery:
                 for name in ("charge", "discharge", "soc"):
                     self.var.setdefault(name, {})[i] = m.addVars(self.T, lb=0, name=f"{name}_{i}")
+        self._add_contract_variables()
 
     def _add_contract_variables(self) -> None:
-        pass
+        self.var["import"] = self.m.addVars(self.I, self.T, lb=0, name="import")
+        self.var["export"] = self.m.addVars(self.I, self.T, lb=0, name="export")
 
     def _objective(self):
         raise NotImplementedError
@@ -314,6 +314,10 @@ class _CommunityModelBase:
             ),
             name="power_balance",
         )
+        self._add_member_constraints()
+
+    def _add_member_constraints(self) -> None:
+        m = self.m
         for i, d in enumerate(self.members):
             lower = d.load_lower_kWh if d.load_lower_kWh is not None else [d.load_min_kWh] * d.n_hours
             upper = d.load_upper_kWh if d.load_upper_kWh is not None else [d.load_max_kWh] * d.n_hours
@@ -347,7 +351,7 @@ class _CommunityModelBase:
                 self._add_member_battery_constraints(i, d)
 
     def _add_contract_constraints(self) -> None:
-        self._add_contract_variables()
+        pass
 
     def _add_member_battery_constraints(self, i: int, d: InputData) -> None:
         m = self.m
@@ -436,6 +440,7 @@ class IndividualContractCommunityModel(_CommunityModelBase):
     mode = ContractMode.INDIVIDUAL
 
     def _add_contract_variables(self) -> None:
+        super()._add_contract_variables()
         self.var["excess"] = self.m.addVars(self.I, self.T, lb=0, name="excess")
 
     def _add_contract_constraints(self) -> None:
@@ -480,17 +485,36 @@ class IndividualContractCommunityModel(_CommunityModelBase):
 
 
 class CommunityContractCommunityModel(_CommunityModelBase):
-    """Community model with one discounted contract at the shared meter."""
+    """Centralized-dispatch community contract at the shared meter."""
 
     mode = ContractMode.COMMUNITY
 
+    def _add_physical_constraints(self) -> None:
+        self.con["net_consumption_balance"] = self.m.addConstrs(
+            (
+                self.var["net_consumption"][i, t]
+                == self.var["load"][i, t]
+                + self._member_var("charge", i, t)
+                - self._member_var("discharge", i, t)
+                - self._member_var("pv", i, t)
+                for i in self.I for t in self.T
+            ),
+            name="net_consumption_balance",
+        )
+        self._add_member_constraints()
+
     def _add_contract_variables(self) -> None:
+        self.var["net_consumption"] = self.m.addVars(
+            self.I, self.T, lb=-GRB.INFINITY, name="net_consumption"
+        )
         self.var["community_import"] = self.m.addVars(self.T, lb=0, name="community_import")
         self.var["community_export"] = self.m.addVars(self.T, lb=0, name="community_export")
         self.var["excess"] = self.m.addVars(self.T, lb=0, name="excess")
+
+    def _add_contract_constraints(self) -> None:
         self.con["community_balance"] = self.m.addConstrs(
             (
-                gp.quicksum(self.var["import"][i, t] - self.var["export"][i, t] for i in self.I)
+                gp.quicksum(self.var["net_consumption"][i, t] for i in self.I)
                 == self.var["community_import"][t] - self.var["community_export"][t]
                 for t in self.T
             ),
@@ -503,6 +527,29 @@ class CommunityContractCommunityModel(_CommunityModelBase):
                 for t in self.T
             ),
             name="excess",
+        )
+
+    def _extract_results(self, status: str) -> Results:
+        hours = list(self.T)
+        hourly = pd.DataFrame(index=pd.Index(hours, name="hour"))
+        hourly["import"] = [self.var["community_import"][t].X for t in hours]
+        hourly["export"] = [self.var["community_export"][t].X for t in hours]
+        hourly["load"] = [sum(self.var["load"][i, t].X for i in self.I) for t in hours]
+        hourly["pv"] = [
+            sum(
+                self._member_var("pv", i, t).X
+                if hasattr(self._member_var("pv", i, t), "X")
+                else 0
+                for i in self.I
+            )
+            for t in hours
+        ]
+        return Results(
+            question=f"{self.mode.value}_community",
+            status=status,
+            objective=self.m.ObjVal,
+            hourly=hourly,
+            meta={"members": len(self.members), "contract_mode": self.mode.value},
         )
 
     def _objective(self):
@@ -523,7 +570,8 @@ class CommunityContractCommunityModel(_CommunityModelBase):
             * self.var["community_import"][t]
             - (self.data.energy_price[t] - (1.0 - beta) * self.members[0].export_tariff)
             * self.var["community_export"][t]
-            + alpha * self.var["excess"][t]
+            + (alpha + beta * self.members[0].import_tariff)
+            * self.var["excess"][t]
             for t in self.T
         )
         return gp.quicksum(member_terms) + meter_terms + self._battery_terminal_value()

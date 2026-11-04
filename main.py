@@ -7,8 +7,9 @@
     python main.py --demo                            # also run the scenario-generation demonstration (Question 3)
     python main.py --R                               # solve the 16-member reference case
     python main.py --I                               # solve the 16-member individual-contract case
+    python main.py --C                               # solve the centralized-dispatch community-contract case
 
-The R and I model runs are implemented in ``src.model`` and write their results to ``results/``.
+The R, I, and C model runs are implemented in ``src.model`` and write their results to ``results/``.
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ def main() -> None:
     ap.add_argument("--demo", action="store_true", help="run the scenario-generation demonstration")
     ap.add_argument("--R", action="store_true", help="run the 16-member reference case without a contract")
     ap.add_argument("--I", action="store_true", help="run the 16-member individual-contract case")
+    ap.add_argument("--C", action="store_true", help="run the centralized-dispatch community-contract case")
     ap.add_argument("--battery-end-value", type=float, default=0.0,
                     help="economic value in DKK/kWh of battery energy at the end of the day")
     args = ap.parse_args()
@@ -46,8 +48,14 @@ def main() -> None:
     if args.demo:
         import runpy
         runpy.run_module("src.scenario_generation", run_name="__main__")
-    if args.R or args.I:
-        mode = ContractMode.INDIVIDUAL if args.I else ContractMode.NONE
+    if args.R or args.I or args.C:
+        mode = (
+            ContractMode.COMMUNITY
+            if args.C
+            else ContractMode.INDIVIDUAL
+            if args.I
+            else ContractMode.NONE
+        )
         result = CommunityModel(
             com,
             contract_mode=mode,
