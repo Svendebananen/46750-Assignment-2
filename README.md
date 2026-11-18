@@ -58,12 +58,14 @@ python main.py --demo           # ... plus the scenario-generation demonstration
 ## 2. Repository structure
 
 ```
-main.py                        Entry point: load a community -> summarize (extend with one function per experiment)
+main.py                        Entry point: load a community -> summarize, run R/I/C, run the Question 1 experiments
 src/
   data_loader.py               load_community("base", day="d1") -> CommunityData:
                                  .members     one Assignment 1 InputData per member (same attribute names as in Assignment 1)
                                  .contract    ContractData: cap, penalty, discount, individual caps and shares of model I
   scenario_generation.py       Question 3: independent preference scenarios per member, merged into joint scenarios (numpy only)
+  analysis_q1.py               Question 1: numbers for base-case comparison, contract sweep, settlement of C
+  plotting.py                  Figures: dispatch/contract plots and the Question 1 figures (gain map, member gains)
 data/
   appliance_params.json        SHARED catalogue (Assignment 1 format): the loads FL_L1-FL_L4 (linear disutility 0.25-2.0 DKK/kWh), PV_01_S, BAT_01_S
   bus_params.json              SHARED connection point: day-1 prices and the grid tariffs (unchanged from Assignment 1)
@@ -90,6 +92,7 @@ python main.py --R
 python main.py --I
 python main.py --C
 ```
+```
 
 Each model run also prints its objective and daily energy totals and writes two figures to
 `results/<community>/`:
@@ -114,6 +117,30 @@ python main.py --R --battery-end-value 0.25
 The model creates PV and battery variables only for members that own those assets. The linear absolute
 deviation from each member's reference profile remains in the objective; the old quadratic disutility
 formulation is not used.
+
+Every experiment of Question 1 is started from `main.py` and writes to `results/base/`.
+The computations are in `src/analysis_q1.py`, the figures in `src/plotting.py`. No random numbers are used, so there are no seeds.
+
+```bash
+python main.py --q1                 # all three experiments below
+python main.py --q1-base            # Comparison of the contract types
+python main.py --q1-sweep           # Sweep of contract terms of I and C over beta^DSO and the cap factor phi (Figure 1)
+python main.py --q1-settlement      # Settlement of C at lambda_t, individual rationality, manager's budget (Figure 2)
+```
+
+The sweep uses `beta^DSO` in {0, 0.25, 0.5, 0.75, 1} and `phi` in {0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.6, 2.0}
+(`phi = 1.3` is the base case, the cap is `phi x daily import of R / 24`; `alpha^DSO` stays at 10). Change them with
+`--betas` and `--phis`, e.g. `python main.py --q1-sweep --betas 0 0.5 1 --phis 1.0 1.3`.
+
+| Command           | Output in `results/base/`                                                      | 
+|-------------------|--------------------------------------------------------------------------------|
+| `--q1-base`       | `q1_table3_base_case.csv`                                                      |
+| `--q1-sweep`      | `q1_sweep_beta_cap.csv`, `q1_gain_map.png`                                     | 
+| `--q1-settlement` | `q1_settlement_members.csv`, `q1_settlement_hourly.csv`, `q1_member_gains.png` | 
+
+The settlement experiment also prints: the manager's surplus `B`, the check `B = sum_t nu_t P_t^DSO`,
+`sum_i S_i = J^C + B`, the number of members worse off than under R and I, and the gain by asset class and by disutility class.
+The dual prices `lambda_t` and `nu_t` are read from the LP solution of model C, so Gurobi must solve it as an LP.
 
 ## 3. How to use the code
 

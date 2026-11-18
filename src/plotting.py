@@ -159,3 +159,45 @@ def plot_member_benefits(
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
+
+
+def plot_gain_map(grid, output_dir: Path | str) -> Path:
+    """Community gain (DKK/day) of I and C relative to R over the discount beta^DSO and the cap factor phi."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    limit = float(max(np.abs(grid["gain_I_vs_R"]).max(), np.abs(grid["gain_C_vs_R"]).max()))
+    fig, axes = plt.subplots(1, 2, figsize=(11, 3.8))
+    for ax, column, title in zip(axes, ("gain_I_vs_R", "gain_C_vs_R"), ("I vs R", "C vs R")):
+        table = grid.pivot(index="beta", columns="phi", values=column).sort_index(ascending=False)
+        image = ax.imshow(table.values, cmap="RdYlGn", vmin=-limit, vmax=limit, aspect="auto")
+        ax.set_xticks(range(len(table.columns)), [f"{x:g}" for x in table.columns])
+        ax.set_yticks(range(len(table.index)), [f"{x:g}" for x in table.index])
+        ax.set(title=f"{title}: community gain (DKK/day)", xlabel="cap factor $\\phi$", ylabel="$\\beta^{DSO}$")
+        for (row, col), value in np.ndenumerate(table.values):
+            ax.text(col, row, f"{value:.1f}", ha="center", va="center", fontsize=8)
+        fig.colorbar(image, ax=ax)
+    fig.tight_layout()
+    path = output_dir / "q1_gain_map.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
+
+
+def plot_member_gains(members, output_dir: Path | str) -> Path:
+    """Member gains (DKK/day) under dual-price settlement in C, relative to R and to I (positive = better off)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    x = np.arange(len(members))
+    fig, ax = plt.subplots(figsize=(10, 4.6))
+    ax.bar(x - 0.2, members["gain_vs_R"], 0.4, label="vs. R")
+    ax.bar(x + 0.2, members["gain_vs_I"], 0.4, label="vs. I")
+    ax.axhline(0, color="black", linewidth=0.8)
+    ax.set_xticks(x, members.index, rotation=70)
+    ax.set(ylabel="Gain (DKK/day)", title="Settlement at $\\lambda_t$ in C (manager keeps the surplus)")
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    path = output_dir / "q1_member_gains.png"
+    fig.savefig(path, dpi=170)
+    plt.close(fig)
+    return path

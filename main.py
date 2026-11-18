@@ -8,6 +8,10 @@
     python main.py --R                               # solve the 16-member reference case
     python main.py --I                               # solve the 16-member individual-contract case
     python main.py --C                               # solve the centralized-dispatch community-contract case
+    python main.py --q1                              # all --Q1: run --q1-base, --q1-sweep and --q1-settlement (Question 1)
+    python main.py --q1-base                         # comparison of R, I and C on the base case (Querstion 1)
+    python main.py --q1-sweep                        # sweep of contract paramters (beta^DSO and phi) for I and C (Question 1)
+    python main.py --q1-settlement                   # settelement of C and manager's budget (Question 1)
 
 The R, I, and C model runs are implemented in ``src.model`` and write their results to ``results/``.
 """
@@ -19,8 +23,37 @@ from pathlib import Path
 from src.data_loader import load_community, list_communities
 from src.model import CommunityModel, ContractMode
 from src.plotting import plot_member_benefits, plot_results
+from src import analysis_q1 as q1
+from src.plotting import plot_gain_map, plot_member_benefits, plot_member_gains, plot_results
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+def run_q1_base(com, end_value: float, out: Path) -> None:
+    """Comparison for the contract types (models R, I and C on the base case)"""
+    table, gains = q1.base_comparison(com, end_value)
+    table.round(2).to_csv(out / "q1_table3_base_case.csv")
+    print("\nTable 3 - base case:\n", table.round(2).to_string())
+    print("Gains (DKK):", {k: round(v, 2) for k, v in gains.items()})
+
+
+def run_q1_sweep(com, end_value: float, out: Path, betas, phis) -> None:
+    """Sensitivity sweep of I and C over the discount beta^DSO and the cap factor phi"""
+    grid = q1.contract_sweep(com, end_value, betas, phis)
+    grid.to_csv(out / "q1_sweep_beta_cap.csv", index=False)
+    print("\nSmallest value of pooling G_C,I over the grid:", round(grid["pooling_value_C_vs_I"].min(), 2), "DKK")
+    print(f"  {plot_gain_map(grid, out)}")
+
+
+def run_q1_settlement(com, end_value: float, out: Path) -> None:
+    """Individual rationality of the dual-price settlement of C and the manager's budget."""
+    members, hourly, numbers = q1.settlement_study(com, end_value)
+    members.round(4).to_csv(out / "q1_settlement_members.csv")
+    hourly.round(4).to_csv(out / "q1_settlement_hourly.csv")
+    print("\nSettlement of C:", {k: (round(v, 2) if not isinstance(v, tuple) else tuple(round(x, 2) for x in v))
+                                  for k, v in numbers.items()})
+    for key in ("assets", "slope"):
+        print(f"\nGain vs R by {key} (DKK/day):\n", members.groupby(key)["gain_vs_R"].sum().round(2).to_string())
+    print(f"  {plot_member_gains(members, out)}")
 
 
 def main() -> None:
@@ -32,8 +65,14 @@ def main() -> None:
     ap.add_argument("--R", action="store_true", help="run the 16-member reference case without a contract")
     ap.add_argument("--I", action="store_true", help="run the 16-member individual-contract case")
     ap.add_argument("--C", action="store_true", help="run the centralized-dispatch community-contract case")
-    ap.add_argument("--battery-end-value", type=float, default=0.0,
-                    help="economic value in DKK/kWh of battery energy at the end of the day")
+    ap.add_argument("--battery-end-value", type=float, default=0.0, help="economic value in DKK/kWh of battery energy at the end of the day")
+    ap.add_argument("--q1", action="store_true", help="Question 1: run --q1-base, --q1-sweep and --q1-settlement")
+    ap.add_argument("--q1-base", action="store_true", help="Section 1.4: Table 3 and the gains of R, I and C")
+    ap.add_argument("--q1-sweep", action="store_true", help="Section 1.5: gain over beta and cap factor (Figure 1)")
+    ap.add_argument("--q1-settlement", action="store_true", help="Sections 1.6-1.7: settlement at lambda_t and manager's budget (Figure 2)")
+    ap.add_argument("--betas", type=float, nargs="*", default=[0.0, 0.25, 0.5, 0.75, 1.0], help="discounts of the sweep")
+    ap.add_argument("--phis", type=float, nargs="*", default=[0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.6, 2.0],
+                    help="cap factors of the sweep (1.3 = base case)")
     args = ap.parse_args()
 
     com = load_community(args.community, day=args.day)
@@ -81,6 +120,13 @@ def main() -> None:
                 RESULTS_DIR / args.community,
             )
             print(f"  {benefit_path}")
+    out = RESULTS_DIR / args.community
+    if args.q1 or args.q1_base:
+        run_q1_base(com, args.battery_end_value, out)
+    if args.q1 or args.q1_sweep:
+        run_q1_sweep(com, args.battery_end_value, out, args.betas, args.phis)
+    if args.q1 or args.q1_settlement:
+        run_q1_settlement(com, args.battery_end_value, out)
 
 
 if __name__ == "__main__":
