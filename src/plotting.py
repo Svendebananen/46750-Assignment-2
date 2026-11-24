@@ -435,3 +435,52 @@ def plot_dp_shift_heatmap(shifts: dict, assets: dict, cap, imports: dict, output
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
+
+def plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_cost, dp_cost: float,
+                       output_dir: Path | str, tag: str = "q3_validation") -> Path:
+    """Question 3, validation in one figure.
+    (a) What the uncertainty does: the community's net reference demand (sum of the members' reference loads minus
+        their available PV) in every in-sample scenario, as a band (min-max over the scenarios) around the base case,
+        against the import cap. Net of PV so that it is comparable with the cap.
+    (b) That the model holds: each scenario's community cost in the SDP model (bars) and when its prices are replayed
+        by the out-of-sample evaluator (markers), against the deterministic DP on the expected parameters (line)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def net_demand(members):
+        return sum(np.asarray(m.reference_load) - (np.asarray(m.pv_available) if m.has_pv else 0.0) for m in members)
+
+    hours = np.arange(len(cap))
+    nets = np.array([net_demand(s.members) for s in scenarios])
+    base = net_demand(base_members)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8), gridspec_kw={"width_ratios": [1.6, 1]})
+    ax1.fill_between(hours, nets.min(axis=0), nets.max(axis=0), step="mid", color="tab:blue", alpha=0.25,
+                     label=f"Range over the {len(scenarios)} scenarios")
+    for k, n in enumerate(nets):
+        ax1.step(hours, n, where="mid", color="tab:blue", linewidth=0.7, alpha=0.6,
+                 label="One scenario" if k == 0 else None)
+    ax1.step(hours, base, where="mid", color="black", linewidth=1.8, label=r"Base case ($\theta = 1$)")
+    ax1.step(hours, cap, where="mid", color="tab:red", linestyle="--", linewidth=1.5, label="Import cap")
+    ax1.axhline(0, color="black", linewidth=0.6)
+    ax1.set(xlabel="hour", ylabel="kW", xticks=hours[::2],
+            title="(a) Net reference demand of the community (load - available PV)")
+    ax1.legend(fontsize=8, loc="upper left")
+    ax1.grid(alpha=0.3)
+
+    s = np.arange(len(in_model_cost))
+    ax2.bar(s, in_model_cost, 0.6, color="tab:blue", alpha=0.6, label="SDP, in the model")
+    ax2.plot(s, evaluator_cost, "D", color="black", markersize=6, label="Same prices, evaluator")
+    ax2.axhline(dp_cost, color="tab:gray", linestyle="--", linewidth=1.5, label="DP, expected parameters")
+    diff = float(np.max(np.abs(np.asarray(evaluator_cost) - np.asarray(in_model_cost))))
+    lo = min(np.min(in_model_cost), np.min(evaluator_cost), dp_cost)
+    hi = max(np.max(in_model_cost), np.max(evaluator_cost), dp_cost)
+    pad = 0.15 * (hi - lo) + 1.0
+    ax2.set(ylim=(lo - pad, hi + pad), xticks=s, xlabel="in-sample scenario", ylabel="community cost (DKK/day)",
+            title=f"(b) Cost per scenario (max difference {diff:.3f} DKK)")
+    ax2.legend(fontsize=8, loc="lower left")
+    ax2.grid(alpha=0.3, axis="y")
+    fig.tight_layout()
+    path = output_dir / f"{tag}.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
