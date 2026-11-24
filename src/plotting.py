@@ -484,3 +484,38 @@ def plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_co
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
+
+
+def plot_q3_uncertainty_impact(ev, predicted_cost: float, predicted_surplus: float, output_dir: Path | str,
+                               label: str = "DP", tag: str = "q3_uncertainty_impact") -> Path:
+    """Question 3, step 1: a deterministic price vector replayed on out-of-sample scenarios.
+    x: the community's daily reference energy in the scenario minus the base case (kWh/day), i.e. how much more the
+    members want than declared. Top: realized community cost; bottom: the manager's surplus (payments - meter bill).
+    Colour: cap exceedance (kWh/day). Dashed: what the deterministic model predicts (expected parameters)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dE, exc = ev["dE"].to_numpy(), ev["exceedance_kWh"].to_numpy()
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7.5), sharex=True)
+    vmax = max(float(exc.max()), 1e-3)
+    for ax, col, pred, name in ((ax1, "cost", predicted_cost, "community cost"),
+                                (ax2, "surplus", predicted_surplus, "manager surplus")):
+        y = ev[col].to_numpy()
+        sc = ax.scatter(dE, y, c=exc, cmap="Reds", vmin=0, vmax=vmax, edgecolor="black", linewidth=0.4, s=36, zorder=3)
+        ax.axhline(pred, color="tab:blue", linestyle="--", linewidth=1.5,
+                   label=f"{label} prediction (expected parameters): {pred:.1f} DKK")
+        ax.axhline(y.mean(), color="black", linestyle=":", linewidth=1.5,
+                   label=f"Realized mean over {len(y)} scenarios: {y.mean():.1f} DKK")
+        ax.set_ylabel(f"{name} (DKK/day)")
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=8, loc="upper left" if col == "cost" else "lower left")
+    ax1.set_title(f"(a) Realized community cost at the posted prices of {label}")
+    ax2.set_title("(b) Manager surplus (payments - meter bill); < 0 is a budget deficit")
+    ax2.axhline(0, color="black", linewidth=0.8)
+    ax2.set_xlabel("community reference energy minus base case (kWh/day): members want more than declared ->")
+    for ax in (ax1, ax2):
+        ax.axvline(0, color="gray", linewidth=0.8)
+    fig.colorbar(sc, ax=(ax1, ax2), pad=0.02, label="cap exceedance (kWh/day)")
+    path = output_dir / f"{tag}.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return path
