@@ -58,11 +58,16 @@ python main.py --demo           # ... plus the scenario-generation demonstration
 ## 2. Repository structure
 
 ```
-main.py                        Entry point: load a community -> summarize (extend with one function per experiment)
+main.py                        Entry point: load a community -> summarize or dispatch to an experiment
 src/
   data_loader.py               load_community("base", day="d1") -> CommunityData:
                                  .members     one Assignment 1 InputData per member (same attribute names as in Assignment 1)
                                  .contract    ContractData: cap, penalty, discount, individual caps and shares of model I
+  model.py                     R, I and C optimization models, sharing a common community-model base
+  dynamic_pricing_model.py     Question 2 dynamic-pricing optimization model and internal settlement prices
+  dynamic_pricing_analysis.py  Question 2 experiment orchestration, metrics, validation and output tables
+  dynamic_pricing_plotting.py  Question 2 figures and the output-directory-aware plotter
+  plotting.py                  Shared R, I and C plots
   scenario_generation.py       Question 3: independent preference scenarios per member, merged into joint scenarios (numpy only)
 data/
   appliance_params.json        SHARED catalogue (Assignment 1 format): the loads FL_L1-FL_L4 (linear disutility 0.25-2.0 DKK/kWh), PV_01_S, BAT_01_S
@@ -77,11 +82,16 @@ results/                       Written by your code (git-ignored)
 requirements.txt, environment.yaml, .gitignore
 ```
 
-The model in `src/model.py` uses the Assignment 1 `InputData` for every member. `CommunityModel`
+The models use the Assignment 1 `InputData` for every member. `CommunityModel`
 is indexed by member and hour and uses `ContractMode.NONE` for the reference case R and
 `ContractMode.INDIVIDUAL` for model I. The three contract modes are implemented as separate
 community-model classes behind the same `CommunityModel` construction API; `ContractMode.COMMUNITY`
 uses one discounted contract at the shared meter with centralized DSO dispatch.
+
+Question 2’s dynamic-pricing model is kept in `src/dynamic_pricing_model.py`; its analysis and
+figures are handled by `src/dynamic_pricing_analysis.py` and `src/dynamic_pricing_plotting.py`.
+The command-line interface remains in `main.py`, so the existing `--DP`, `--bb`, `--ir`, and
+`--cap-f` options continue to run the same experiments.
 
 Run the implemented cases with:
 
@@ -89,7 +99,12 @@ Run the implemented cases with:
 python main.py --R
 python main.py --I
 python main.py --C
+python main.py --DP
 ```
+
+Question 2 can add budget balance (`--DP --bb`), budget balance plus individual
+rationality (`--DP --ir`), or run a cap-tightness sweep (`--DP --cap-f 1.0 1.3 1.6`).
+The analysis, validation tables, and figures are written under `results/<community>/`.
 
 Each model run also prints its objective and daily energy totals and writes two figures to
 `results/<community>/`:
