@@ -1,53 +1,109 @@
 # Question 3 on the DTU HPC
 
-The runs of `src/q3_experiments.py` as LSF jobs: one job per run, each started when the run it starts from is
-done, so independent chains run in parallel (DP_BB -> DP_BB_IR -> SDPx_N5 -> CVaR, N=3, 7, 10, and
-eps=0 -> 0.2 -> 0.4). A last job evaluates every run on the 100 out-of-sample scenarios and draws figures 2-4.
+The runs of `src/q3_experiments.py` as LSF jobs on the DTU HPC: one job per run, each started when the run it
+starts from is done, so independent runs solve in parallel and the PC can be switched off. A last job evaluates
+every run on the 100 out-of-sample scenarios and draws figures 2-4.
 
-## 1. Log in and get the code (once)
+    DP_BB -> DP_BB_IR -> SDPx_N5 -> SDPcvar_N5, SDPx_N3, SDPx_N7, SDPx_N10      (each "->" = starts from)
+    SDPeps0_N5 -> SDPeps20_N5 -> SDPeps40_N5
+
+Every command below says where it runs:
+
+| Prompt looks like | Where | Used for |
+|---|---|---|
+| `you@your-pc:...$` | a terminal **on the PC**, in the repository folder | `scp` to and from the cluster |
+| `hpclogin1(user) $` | the cluster's **login node** | `git`, submitting jobs, `bjobs` |
+| `n-62-...(user) $` | an **interactive node** (`linuxsh`) | the one-time setup |
+
+`scp` must always run **on the PC** (it copies between the PC and the cluster); run on the cluster it finds nothing.
+
+## 1. Log in (cluster)
 
 ```bash
-ssh <DTU-user>@login1.hpc.dtu.dk          # the login address in DTU's HPC guide
-linuxsh                                   # an interactive node for the setup (not the login node)
+ssh <DTU-user>@login1.hpc.dtu.dk
+```
+
+From outside DTU without the DTU VPN, the login needs an ssh key (+ its passphrase + the DTU password); on the DTU
+network or the VPN the DTU password is enough. See https://www.hpc.dtu.dk/?page_id=4317.
+
+## 2. One-time setup (cluster)
+
+```bash
 git clone https://github.com/Svendebananen/46750-Assignment-2.git
 cd 46750-Assignment-2
 git checkout q3-stochastic-pricing
+linuxsh                                   # interactive node for the setup (exit returns to the login node)
+cd ~/46750-Assignment-2
+bash hpc/setup_q3.sh
 ```
 
-## 2. Python environment and licence check (once)
+`setup_q3.sh` loads the modules of `hpc/config.sh` (`gurobi/13.0.0`, `python3/3.12.11`), creates the virtual
+environment `.venv-hpc` with `gurobipy==13.0.0` and solves a 3000-variable test model. It must end with
+
+    Gurobi (13, 0, 0) licence OK
+
+The cluster's Gurobi module provides the licence; nothing else is needed. If a module is missing
+(`ERROR: Unable to locate a modulefile`), list the versions with `module avail gurobi` / `module avail python3` and
+change `hpc/config.sh`.
+
+Later updates of the code: `git pull` on the cluster. If git refuses because `hpc/config.sh` was edited by hand,
+discard the edit first: `git checkout hpc/config.sh && git pull`.
+
+## 3. Copy the runs already solved on the PC (PC)
+
+The results are not in git. Runs that already exist on the cluster are skipped, and a run can only start when the
+run it starts from is there (e.g. `SDPx_N3` needs `SDPx_N5`). To reuse the PC's runs, copy them **from the PC**:
 
 ```bash
-module avail gurobi       # pick a 13.x version and write it in hpc/config.sh (GUROBI_MODULE)
-module avail python3      # write a 3.10+ version in hpc/config.sh (PYTHON_MODULE)
-bash hpc/setup_q3.sh      # creates .venv-hpc and solves a 3000-variable test model
-```
-
-`licence OK` at the end means Gurobi found the cluster's licence. A licence error means the module does not
-provide one: ask the HPC support, or use a free Gurobi academic WLS licence (`~/gurobi.lic`; at most 2 sessions
-at a time, the compute nodes need internet access).
-
-## 3. Results already solved on the PC (optional)
-
-Runs that are already solved are skipped. To reuse the PC's runs (e.g. to solve only N = 3 and N = 7, which start
-from SDPx_N5), copy them from the PC (the results folder is not in git):
-
-```bash
+ssh <DTU-user>@login1.hpc.dtu.dk "mkdir -p 46750-Assignment-2/results/base/q3"
 scp -r results/base/q3/runs <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/
 ```
 
-## 4. Submit
+Check on the cluster: `ls ~/46750-Assignment-2/results/base/q3/runs/SDPx_N5` lists `meta.json`, `prices.csv`,
+`core_solution.npy`, ... A run that was still solving on the PC is copied without `meta.json` and counts as not
+solved.
+
+## 4. Submit (cluster)
 
 ```bash
-bash hpc/submit_q3.sh                     # every run that is not solved yet, then the evaluation
-bash hpc/submit_q3.sh SDPx_N3 SDPx_N7     # only these
-bjobs                                     # the queue: PEND = waiting (queue or dependency), RUN = running
+cd ~/46750-Assignment-2
+bash hpc/submit_q3.sh                     # every run of RUNS that is not solved yet, then the evaluation
+bash hpc/submit_q3.sh SDPx_N3 SDPx_N7     # only these runs (their start runs must be solved or submitted too)
 ```
 
-Logs: `hpc/logs/q3_<run>_<jobid>.out` (and `.err`), Gurobi's log: `results/base/q3/runs/<run>/gurobi.log`.
-Results: `results/base/q3/` (comparison table, figures). Copy them back to the PC with `scp -r` the other way.
+Each run prints `already solved, skipped` or `submitted (after <run>)`, and the evaluation job comes last.
+
+| Command | |
+|---|---|
+| `bjobs` | your jobs: `PEND` = waiting for the queue or for the run it starts from, `RUN` = solving |
+| `bkill <jobid> ...` | cancel jobs (e.g. jobs submitted before the start runs were copied) |
+| `tail -f results/base/q3/runs/<run>/gurobi.log` | follow a run's Gurobi log (`Ctrl+C` stops following) |
+| `hpc/logs/q3_<run>_<jobid>.out` / `.err` | the job's output and errors |
+
+The jobs keep running after you log out. `bjobs` says `No unfinished job found` when everything is done.
+
+## 5. Bring the results back (PC)
+
+Copy the new runs **from the PC**, then evaluate every run together and draw the figures there (about 3 min):
+
+```bash
+scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N3 \
+       <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N7 results/base/q3/runs/
+.venv/bin/python -m src.q3_experiments --evaluate
+.venv/bin/python -m src.q3_figures
+```
+
+Evaluating on the PC keeps all runs in one table and one set of figures even when some were solved on the PC
+and some on the cluster. (The cluster's evaluation job does the same with the runs that are on the cluster.)
 
 ## Settings (`hpc/config.sh`)
 
-Cores per run (`CORES`, passed to Gurobi as threads), memory per core, wall time per run (`WALL`, 1:30 covers the
-900 s start phase + 1800 s solve) and the queue. The time limits of the runs themselves are in `RUNS` of
-`src/q3_experiments.py`.
+| Setting | Value | |
+|---|---|---|
+| `GUROBI_MODULE`, `PYTHON_MODULE` | `gurobi/13.0.0`, `python3/3.12.11` | same Gurobi major version as on the PC (13.0.3) |
+| `CORES` | 8 | cores per run, passed to Gurobi as `--threads` |
+| `MEM_PER_CORE` | 4GB | LSF memory is per core |
+| `WALL` | 01:30 | wall time per job: 900 s start phase + 1800 s solve + margin |
+| `QUEUE` | hpc | |
+
+The time limits of the runs themselves are in `RUNS` of `src/q3_experiments.py`; raise `WALL` with them.
