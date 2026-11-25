@@ -61,8 +61,8 @@ RUNS: dict[str, dict] = {
                         time_limit=1800, start="SDPeps0_N5", start_core=True),
     "SDPeps40_N5": dict(label=r"$\mathcal{SDP}^{\varepsilon=0.4}$, N=5", n=5, constraints="chance", epsilon=0.4,
                         time_limit=1800, start="SDPeps20_N5", start_core=True),
-    "SDPx_N10": dict(label=r"$\mathcal{SDP}^{x}$, N=10", n=10, time_limit=1800, start="SDPx_N5", box=0.05,
-                     start_time_limit=300),
+    "SDPx_N10": dict(label=r"$\mathcal{SDP}^{x}$, N=10", n=10, time_limit=1800, start="SDPx_N5", box=0.1,
+                     start_time_limit=900),
 }
 # start: the run whose prices start this one ("DP": the cap-only DP, whose surplus of about +150 DKK meets budget
 # balance >= 0 in every scenario); start_core: start from that run's whole solution (x, flows, multipliers), which
@@ -143,8 +143,9 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
         start_time_limit=cfg.get("start_time_limit", 120) * min(scale, 1.0), start_solution=core,
         **{k: cfg[k] for k in MODEL_KEYS if k in cfg}).build()
     folder.mkdir(parents=True, exist_ok=True)
-    model.m.Params.LogFile = str(folder / "gurobi.log")
+    model.m.Params.OutputFlag = 1                      # log to the file only (verbose=False turns logging off)
     model.m.Params.LogToConsole = 0
+    model.m.Params.LogFile = str(folder / "gurobi.log")
     t0 = time.time()
     r = model.solve()
     pd.DataFrame({"hour": list(model.T), "price": r.prices}).to_csv(folder / "prices.csv", index=False)
@@ -155,7 +156,8 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
             "wall_time_s": time.time() - t0, "seed_in": SEED_IN, **r.meta}
     (folder / "meta.json").write_text(json.dumps(meta, indent=1, default=lambda o: o.tolist()
                                                  if hasattr(o, "tolist") else str(o)), encoding="utf-8")
-    print(f"[{name}] {r.summary()}", flush=True)
+    ws = r.meta.get("warm_start") or {}
+    print(f"[{name}] {r.summary()} | start found {ws.get('found')}, used {ws.get('start_used')}", flush=True)
 
 
 def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0) -> None:

@@ -123,7 +123,7 @@ class StochasticDynamicPricingModel:
     scenarios      : list of ``scenario_data.Scenario`` (probabilities must sum to one)
     objective      : "expectation" or "cvar" (cvar_alpha = share of worst scenarios, cvar_weight = w in [0, 1])
     constraints    : "expectation" or "chance" (epsilon = allowed probability of violation; 0 = every scenario)
-    budget_balance : impose the budget-balance requirement (in the sense of ``constraints``)
+    budget_balance : impose the budget-balance requirement (in the sense of ``constraints``), up to bb_tol DKK
     ir_benchmark   : None (no IR) or one {consumer_id: cost} per scenario, the C^R_is (see ``benchmark_costs``)
     ir_penalty     : kappa^IR, DKK per DKK of IR slack
     reg_weight     : rho, weight of sum_t |x_t - reg_reference_t| (reg_reference default: discounted import price)
@@ -141,7 +141,8 @@ class StochasticDynamicPricingModel:
                  method: str = "SOS1", tight_M: bool = True, M_scale: float = 1.0, M_P: float = 50.0,
                  M_D: float = 100.0, battery_end_soc_value_DKK_per_kWh: float = 0.0,
                  mip_gap: float = 1e-4, time_limit: float | None = None, mip_focus: int = 0,
-                 start_prices=None, start_box: float = 0.0, start_time_limit: float = 60.0, start_solution=None,
+                 bb_tol: float = 1e-4, start_prices=None, start_box: float = 0.0, start_time_limit: float = 60.0,
+                 start_solution=None,
                  threads: int = 0,
                  verbose: bool = False):
         if objective not in OBJECTIVES or constraints not in CONSTRAINTS:
@@ -162,6 +163,7 @@ class StochasticDynamicPricingModel:
         self.reg_weight, self.reg_reference = reg_weight, reg_reference
         self.start_prices, self.start_box, self.start_time_limit = start_prices, start_box, start_time_limit
         self.start_solution = start_solution
+        self.bb_tol = bb_tol
         self.terminal_value = battery_end_soc_value_DKK_per_kWh
         self.dp_kwargs = dict(method=method, tight_M=tight_M, M_scale=M_scale, M_P=M_P, M_D=M_D,
                               battery_end_soc_value_DKK_per_kWh=battery_end_soc_value_DKK_per_kWh)
@@ -206,7 +208,11 @@ class StochasticDynamicPricingModel:
         I = range(len(ids))
         if self.constraints_mode == "expectation":
             if self.budget_balance:
-                self.con_bb = m.addConstr(gp.quicksum(pi[s] * self.expr["B"][s] for s in S) == 0, name="bb_expected")
+                eb = gp.quicksum(pi[s] * self.expr["B"][s] for s in S)
+                # = 0 up to bb_tol DKK: an exact equality makes any solution read back from Gurobi (rounding ~1e-5)
+                # infeasible, so that it cannot start another variant
+                self.con_bb = (m.addConstr(eb <= self.bb_tol, name="bb_expected_up"),
+                               m.addConstr(eb >= -self.bb_tol, name="bb_expected_lo"))
             if self.ir_benchmark is not None:
                 zeta = self.var["zeta"] = m.addVars(I, lb=0.0, name="zeta")
                 for i, cid in enumerate(ids):
@@ -222,7 +228,7 @@ class StochasticDynamicPricingModel:
         for s in S:
             rows = []
             if self.budget_balance:
-                rows.append((self.expr["B"][s], GRB.GREATER_EQUAL, f"bb_{s}"))
+                rows.append((self.expr["B"][s] + self.bb_tol, GRB.GREATER_EQUAL, f"bb_{s}"))
             if self.ir_benchmark is not None:
                 for i, cid in enumerate(ids):
                     rows.append((self.expr["D"][s][i] - self.ir_benchmark[s][cid] - self.var["zeta"][s, i],
@@ -306,25 +312,53 @@ class StochasticDynamicPricingModel:
         on the same scenarios (``start_solution``), which differs only in the variables added after the blocks."""
         return np.array([v.X for v in self.m.getVars()[:self.n_core]])
 
-    def set_core_start(self, values) -> None:
-        """Start x and the scenario blocks from ``core_solution()`` of a variant on the same scenarios; Gurobi
-        completes the rest (zeta, b, VaR, u, price deviations)."""
+    def set_core_start(self, values, time_limit: float = 120.0) -> bool:
+        """Start from ``core_solution()`` of a variant on the same scenarios (x, flows, multipliers).
+
+        The core variables are fixed to these values and Gurobi completes the variables of this variant (zeta, b, VaR,
+        u, price deviations): an LP (a small MIP with b), solved in seconds. The completed solution becomes the MIP
+        start and the core is released. Falls back to the fixed-price phase of ``warm_start`` if the values are not
+        feasible here (e.g. a run with looser requirements given as start of a stricter one)."""
         values = np.asarray(values, dtype=float)
         if len(values) != self.n_core:
             raise ValueError(f"start has {len(values)} values, the model has {self.n_core} core variables")
-        for v, val in zip(self.m.getVars()[:self.n_core], values):
+        m = self.m
+        core = m.getVars()[:self.n_core]
+        bounds = [(v.LB, v.UB) for v in core]
+        for v, val in zip(core, values):
+            v.LB = v.UB = val
+        old_limit = m.Params.TimeLimit
+        m.Params.TimeLimit = min(time_limit, old_limit)
+        m.optimize()
+        found = m.SolCount > 0
+        start = [(v, v.X) for v in m.getVars()] if found else []
+        objective, runtime = (m.ObjVal if found else None), m.Runtime
+        for v, (lb, ub) in zip(core, bounds):
+            v.LB, v.UB = lb, ub
+        m.Params.TimeLimit = old_limit
+        m.reset()
+        if not found:
+            ok = self.warm_start(values[:len(self.T)], time_limit=time_limit, box=0.0)    # x is created first
+            self.warm_start_info["source"] = "core solution infeasible here -> prices only"
+            return ok
+        for v, val in start:
             v.Start = val
-        self.m.update()
-        self.warm_start_info = {"found": None, "status": "core solution given", "box": None}
+        m.update()
+        self.warm_start_info = {"found": True, "status": "core solution completed", "objective": objective,
+                                "runtime_s": runtime, "box": 0.0, "source": "core solution"}
+        return True
 
     def solve(self) -> StochasticResult:
         if self.start_solution is not None:
-            self.set_core_start(self.start_solution)
+            self.set_core_start(self.start_solution, self.start_time_limit)
         elif self.start_prices is not None:
             self.warm_start(self.start_prices, self.start_time_limit, self.start_box)
         self.m.optimize()
         if self.m.SolCount == 0:
             raise RuntimeError(f"{self.name}: no solution, Gurobi status {self.m.Status}")
+        info = getattr(self, "warm_start_info", None)
+        if info and info.get("objective") is not None:     # Gurobi never ends above a start it accepted
+            info["start_used"] = self.m.ObjVal <= info["objective"] + 1e-6 * (1 + abs(info["objective"]))
         return self._extract()
 
     def _extract(self) -> StochasticResult:
