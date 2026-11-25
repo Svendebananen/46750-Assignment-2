@@ -48,8 +48,12 @@ def plot_results(
     hourly = result.hourly
     hours = np.asarray(hourly.index)
     mode = result.meta.get("contract_mode", "unknown")
-    title_mode = {"none": "R: reference case", "individual": "I: individual contracts",
-                  "community": "C: community contract", "dynamic": "DP: dynamic pricing"}.get(mode, mode)
+    title_mode = {
+        "none": "R: reference case",
+        "individual": "I: individual contracts",
+        "community": "C: community contract",
+        "dynamic": "DP: dynamic pricing",
+    }.get(mode, mode)
     stem = result.question + (f"_{tag}" if tag else "")
 
     dispatch_path = output_dir / f"{stem}_dispatch.png"
@@ -87,8 +91,15 @@ def plot_results(
             bbox={"facecolor": "white", "alpha": 0.8, "edgecolor": "0.7"},
         )
     elif np.any(excess > 1e-8):
-        ax.fill_between(hours, cap, net_import, where=net_import > cap, alpha=0.25,
-                        color="tab:red", label="Import above cap")
+        ax.fill_between(
+            hours,
+            cap,
+            net_import,
+            where=net_import > cap,
+            alpha=0.25,
+            color="tab:red",
+            label="Import above cap",
+        )
     ax.set(
         title=f"{title_mode}: grid import and capacity limit",
         xlabel="Hour of day",
@@ -129,7 +140,8 @@ def plot_member_benefits(
     asset_types = ("No asset", "PV", "Battery", "PV and battery")
     asset_members = {
         asset_type: [
-            member for member in members
+            member
+            for member in members
             if (
                 asset_type == "No asset" and not member.has_pv and not member.has_battery
                 or asset_type == "PV" and member.has_pv and not member.has_battery
@@ -151,11 +163,14 @@ def plot_member_benefits(
     fig, ax = plt.subplots(figsize=(10, 6))
     bottoms = np.zeros(len(asset_types))
     for member in members:
-        benefits = np.array([
-            reference_costs[member.consumer_id] - contract_costs[member.consumer_id]
-            if member.consumer_id in asset_member_ids[asset_type] else 0.0
-            for asset_type in asset_types
-        ])
+        benefits = np.array(
+            [
+                reference_costs[member.consumer_id] - contract_costs[member.consumer_id]
+                if member.consumer_id in asset_member_ids[asset_type]
+                else 0.0
+                for asset_type in asset_types
+            ]
+        )
         if not np.any(benefits):
             continue
         ax.bar(
