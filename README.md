@@ -2,7 +2,9 @@
 
 Starter package for **Group Assignment 2** of *46750 - Optimization in Modern Power Systems* (DTU).
 It contains the input data of every question (in `data/`), the Assignment 1 data loader extended to a
-community and the scenario-generation module of Question 3 (in `src/`), and the instructions below.
+community and the scenario-generation utilities for Question 3 (in `src/`), and the instructions below.
+The Question 3 scenario-generation utilities are provided, but there is currently no Question 3 optimization
+experiment in the command-line interface.
 The assignment text (*Assignment 2 - Instructions* in DTU Learn) is the reference for the questions; this
 README documents the data and the code conventions.
 
@@ -24,12 +26,25 @@ data you add are part of the code deliverable and must be documented here.
 Use one of the two options (both install the same packages).
 
 **Option A - pip and venv**
-```bash
+```sh
 python -m venv venv
-source venv/bin/activate            # macOS / Linux
-# venv\Scripts\activate.bat         # Windows cmd
-# venv\Scripts\Activate.ps1         # Windows PowerShell
-pip install -r requirements.txt
+```
+
+Activate the environment using the command for your shell:
+
+```sh
+source venv/bin/activate             # macOS / Linux
+```
+```bat
+venv\Scripts\activate.bat            rem Windows Command Prompt
+```
+```powershell
+.\venv\Scripts\Activate.ps1          # Windows PowerShell
+```
+
+Then install the dependencies:
+```sh
+python -m pip install -r requirements.txt
 ```
 
 **Option B - conda**
@@ -40,19 +55,19 @@ conda activate 46750-a2
 
 ### 1.2 Gurobi licence
 
-The code uses [Gurobi](https://www.gurobi.com) through the `gurobipy` package. **The restricted licence
-shipped with the package (2000 variables/constraints) is not large enough for Questions 2 and 3** - sixteen
-members' KKT systems with binaries, replicated per scenario. Request the
-free [academic licence](https://www.gurobi.com/academia/academic-program-and-licenses/) with your DTU
-e-mail and activate it with `grbgetkey <your-key>` (on the DTU network or VPN) before you start. Every member's
-problem is a linear program, so the single-level reformulations of Questions 2-3 are mixed-integer linear programs (KKT
-conditions, big-M or SOS1 complementarity, strong-duality linearization of the payments); use a time limit and a MIP gap.
+The model-solving commands use [Gurobi](https://www.gurobi.com) through the `gurobipy` package and need a
+valid Gurobi licence. Request the free [academic licence](https://www.gurobi.com/academia/academic-program-and-licenses/)
+with your DTU e-mail and activate it with `grbgetkey <your-key>` (on the DTU network or VPN). The dynamic-pricing
+model (`--DP`) reformulates member LP optimality conditions with complementarity constraints, using big-M by
+default or SOS1 when requested; its default MIP gap is 0.001. `--time-limit` can set a solver time limit.
+Question 3 scenario generation does not currently solve an optimization model.
 
 ### 1.3 Check that everything works
 ```bash
 python main.py                  # loads the base case (16 members, day d1) and prints a summary
 python main.py --members        # ... plus the Assignment 1 summary of every member
 python main.py --demo           # ... plus the scenario-generation demonstration (Question 3)
+python main.py --R              # solve a model and verify that Gurobi is available/licensed
 ```
 
 ## 2. Repository structure
@@ -66,7 +81,10 @@ src/
   scenario_generation.py       Question 3: independent preference scenarios per member, merged into joint scenarios (numpy only)
   analysis_q1.py               Question 1: calculations and experiment runner for comparison, sensitivity, settlement
   q1_plotting.py               Question 1: sensitivity and settlement figures
-  plotting.py                  Shared dispatch and contract figures; Question 2 figures live in dynamic_pricing_plotting.py
+  dynamic_pricing_model.py     Question 2: dynamic-pricing optimization model
+  dynamic_pricing_analysis.py  Question 2: experiment runner and result reporting
+  dynamic_pricing_plotting.py  Question 2: figures
+  plotting.py                  Shared dispatch and contract figures
 data/
   appliance_params.json        SHARED catalogue (Assignment 1 format): the loads FL_L1-FL_L4 (linear disutility 0.25-2.0 DKK/kWh), PV_01_S, BAT_01_S
   bus_params.json              SHARED connection point: day-1 prices and the grid tariffs (unchanged from Assignment 1)
@@ -94,16 +112,15 @@ python main.py --I
 python main.py --C
 python main.py --DP
 ```
-```
 
-Each model run also prints its objective and daily energy totals and writes two figures to
-`results/<community>/`:
+Each `--R`, `--I`, or `--C` run prints its objective and daily energy totals and writes dispatch and contract
+figures to `results/<community>/`:
 
 - `<mode>_dispatch.png` compares community load, PV generation, grid import, and export over the day.
 - `<mode>_contract.png` compares grid import with the DSO capacity limit. For `R`, the figure shows the
   unconstrained reference import; for `I` and `C`, import above the cap is highlighted.
-- `<mode>_member_benefits.png` (for `I` and `C`) stacks each member's operating-cost benefit versus `R`
-  within the four asset groups: no asset, PV, battery, and PV plus battery.
+- `<mode>_member_benefits.png` is also written for `I` and `C`; it stacks each member's operating-cost benefit
+  versus `R` within the four asset groups: no asset, PV, battery, and PV plus battery.
 
 In model `C`, the DSO centrally dispatches every member's flexible load, PV, and battery. Member net
 consumption is settled internally; only aggregate community import and export are exchanged through the
@@ -154,6 +171,13 @@ The command-line interface remains in `main.py`, so the existing `--DP`, `--bb`,
 Question 2 can add budget balance (`--DP --bb`), budget balance plus individual
 rationality (`--DP --ir`), or run a cap-tightness sweep (`--DP --cap-f 1.0 1.3 1.6`).
 The analysis, validation tables, and figures are written under `results/<community>/`.
+Additional solver/model options include `--sos1` (use SOS1 complementarity), `--tight-M` (use per-set
+big-M bounds), `--M-scale` (scale those bounds), `--reg` (price regularization), `--time-limit`,
+`--mip-focus`, `--ir-penalty`, and `--ir-bench`. Run `python main.py --help` for the full option descriptions.
+
+Question 3 is not yet a solver-backed experiment: `--demo` runs the scenario-generation demonstration, and
+`src/scenario_generation.py` provides functions for drawing and merging preference scenarios. The notebook
+example below shows those utilities; it does not run a Question 3 optimization.
 
 
 ## 3. How to use the code

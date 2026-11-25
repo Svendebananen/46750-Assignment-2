@@ -47,6 +47,9 @@ def main() -> None:
         default=0.0,
         help="economic value in DKK/kWh of battery energy at the end of the day",
     )
+    ap.add_argument("--final-soc", choices=("initial", "free"), default="initial",
+        help="battery end-of-day state of charge: equal to the initial state (as in the reference of the contract file) or free"
+    )
     ap.add_argument("--q1", action="store_true", help="run all Question 1 experiments")
     ap.add_argument("--q1-base", action="store_true", help="compare R, I, and C on the base case")
     ap.add_argument("--q1-sweep", action="store_true", help="sweep the contract discount and cap factor")
@@ -97,6 +100,10 @@ def main() -> None:
     args = ap.parse_args()
 
     community = load_community(args.community, day=args.day)
+    if args.final_soc == "initial":
+        for m in community.members:
+            if m.has_battery:
+                m.battery_final_soc_kWh = m.battery_initial_soc_kWh
     print(community.summary(), "\n")
     if args.members:
         for member in community.members:
