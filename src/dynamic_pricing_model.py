@@ -38,7 +38,7 @@ class DynamicPricingCommunityModel(CommunityContractCommunityModel):
     def __init__(self, data, name="dynamic_pricing", verbose=False,
                 battery_end_soc_value_DKK_per_kWh=0.0,
                 method="bigM", M_P=50.0, M_D=100.0, reg_weight=0.0, reg_reference=None,
-                mip_gap=1e-6, time_limit=None, budget_balance=False,
+                mip_gap=1e-3, time_limit=None, budget_balance=False,
                 ir_benchmark=None, ir_penalty=100.0, tight_M=False, M_scale=1.0, mip_focus=0):
         super().__init__(data, name=name, verbose=verbose,
                          battery_end_soc_value_DKK_per_kWh=battery_end_soc_value_DKK_per_kWh)
