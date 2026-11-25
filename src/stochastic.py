@@ -523,9 +523,10 @@ def evaluate_prices(com: CommunityData, prices, scenarios: list[sd.Scenario],
 
 
 def risk_metrics(scen: pd.DataFrame, members: pd.DataFrame | None = None, alpha: float = 0.2,
-                 tol: float = 1e-4) -> dict[str, float]:
+                 tol: float = 1e-3) -> dict[str, float]:
     """Distribution metrics of a scenario table (equiprobable or weighted): mean, quantiles and CVaR of the cost,
-    frequency and size of budget deficits, of IR violations and of cap exceedance."""
+    frequency and size of budget deficits, of IR violations and of cap exceedance. A deficit, violation or
+    exceedance counts when it exceeds tol (DKK or kWh), above the models' bb_tol = 1e-4 DKK."""
     w = scen["probability"].to_numpy() / scen["probability"].sum()
     cost = scen["cost"].to_numpy()
     order = np.argsort(cost)[::-1]                             # worst first

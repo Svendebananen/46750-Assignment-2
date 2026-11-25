@@ -6,9 +6,11 @@
     python -m src.q3_experiments --runs --evaluate     # both (the overnight command)
     python -m src.q3_experiments --list                # the runs and whether they are finished
 
-Seeds (report them): in-sample scenarios seed 1 (N = 5, 10; nested: the first 5 of N = 10 are those of N = 5),
+Seeds (report them): in-sample scenarios seed 1 (N = 3, 5, 7, 10; nested: the first N of a larger set are the
+smaller set),
 out-of-sample scenarios seed 1000 (100 scenarios), the same out-of-sample set for every model (common random numbers).
-IR benchmark: model R per scenario. Price regularization towards C's internal prices lambda^C (weight 1e-3).
+IR benchmark: min(C^R_is, C^I_is) per member and scenario, the member's better option without the community (R or
+the individual contract I), as in Question 2. Price regularization towards C's internal prices lambda^C (weight 1e-3).
 
 Step 1 (suggested step of the assignment): how do different draws of the profiles change the members' response at the
 prices of the deterministic model DP (expected parameters), and in turn the manager's cost, budget and the members'
@@ -45,6 +47,7 @@ from .stochastic import StochasticDynamicPricingModel, benchmark_costs, evaluate
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 SEED_IN, SEED_OUT, N_OUT = 1, 1000, 100
+IR_RULE = "best"          # IR benchmark: "best" = min(R, I) per member and scenario (as in Question 2); "R"; "I"
 
 # name -> settings. n = 0: the expected scenario only (the deterministic models). Order matters: a run starts from
 # the prices of an earlier one. box = how far the start may move the prices (DKK/kWh) to meet the run's requirements.
@@ -61,6 +64,10 @@ RUNS: dict[str, dict] = {
                         time_limit=1800, start="SDPeps0_N5", start_core=True),
     "SDPeps40_N5": dict(label=r"$\mathcal{SDP}^{\varepsilon=0.4}$, N=5", n=5, constraints="chance", epsilon=0.4,
                         time_limit=1800, start="SDPeps20_N5", start_core=True),
+    "SDPx_N3": dict(label=r"$\mathcal{SDP}^{x}$, N=3", n=3, time_limit=1800, start="SDPx_N5", box=0.1,
+                    start_time_limit=900),
+    "SDPx_N7": dict(label=r"$\mathcal{SDP}^{x}$, N=7", n=7, time_limit=1800, start="SDPx_N5", box=0.1,
+                    start_time_limit=900),
     "SDPx_N10": dict(label=r"$\mathcal{SDP}^{x}$, N=10", n=10, time_limit=1800, start="SDPx_N5", box=0.1,
                      start_time_limit=900),
 }
@@ -92,7 +99,7 @@ def step1(com, out: Path, n_out: int = N_OUT, seed_out: int = SEED_OUT) -> pd.Da
     x = r.hourly["posted_price"].to_numpy()
     oos = sd.draw_scenarios(com, n=n_out, seed=seed_out)
     sd.check_scenarios(com, oos)
-    bench = benchmark_costs(com, oos)
+    bench = benchmark_costs(com, oos, IR_RULE)
     ev, mem = evaluate_prices(com, x, oos, benchmark=bench, label="DP")
     ev["dE"] = ev["reference_energy_kWh"] - sum(m.reference_load.sum() for m in com.members)
     metrics = pd.DataFrame([{"model": "DP", "predicted_cost": r.meta["welfare_cost"],
@@ -121,10 +128,10 @@ def load_prices(folder: Path) -> np.ndarray:
     return pd.read_csv(folder / "prices.csv")["price"].to_numpy()
 
 
-def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0) -> None:
+def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0, threads: int = 0) -> None:
     folder = runs_dir / name
     scen = in_sample(com, cfg["n"])
-    bench = benchmark_costs(com, scen) if cfg.get("ir", True) else None
+    bench = benchmark_costs(com, scen, IR_RULE) if cfg.get("ir", True) else None
     start, core = None, None
     if cfg.get("start") == "DP":
         r_dp, _ = deterministic_dp(com)
@@ -140,7 +147,7 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
     model = StochasticDynamicPricingModel(
         com, scen, name=name, budget_balance=True, ir_benchmark=bench, reg_reference=lam, time_limit=tl,
         mip_focus=1, start_prices=start, start_box=cfg.get("box", 0.0),
-        start_time_limit=cfg.get("start_time_limit", 120) * min(scale, 1.0), start_solution=core,
+        start_time_limit=cfg.get("start_time_limit", 120) * min(scale, 1.0), start_solution=core, threads=threads,
         **{k: cfg[k] for k in MODEL_KEYS if k in cfg}).build()
     folder.mkdir(parents=True, exist_ok=True)
     model.m.Params.OutputFlag = 1                      # log to the file only (verbose=False turns logging off)
@@ -153,14 +160,14 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
     r.scenarios.to_csv(folder / "in_sample_scenarios.csv", index=False)
     r.members.to_csv(folder / "in_sample_members.csv", index=False)
     meta = {"name": name, "label": cfg["label"], "config": cfg, "status": r.status, "objective": r.objective,
-            "wall_time_s": time.time() - t0, "seed_in": SEED_IN, **r.meta}
+            "wall_time_s": time.time() - t0, "seed_in": SEED_IN, "ir_rule": IR_RULE, **r.meta}
     (folder / "meta.json").write_text(json.dumps(meta, indent=1, default=lambda o: o.tolist()
                                                  if hasattr(o, "tolist") else str(o)), encoding="utf-8")
     ws = r.meta.get("warm_start") or {}
     print(f"[{name}] {r.summary()} | start found {ws.get('found')}, used {ws.get('start_used')}", flush=True)
 
 
-def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0) -> None:
+def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0, threads: int = 0) -> None:
     runs_dir = out / "runs"
     lam = c_prices(com)
     for name, cfg in RUNS.items():
@@ -171,7 +178,7 @@ def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0) 
             continue
         print(f"[{name}] solving (time limit {cfg['time_limit'] * scale:.0f} s) ...", flush=True)
         try:
-            solve_run(com, name, cfg, runs_dir, lam, scale)
+            solve_run(com, name, cfg, runs_dir, lam, scale, threads)
         except Exception as err:                       # keep going: later runs may not depend on this one
             print(f"[{name}] FAILED: {err}", flush=True)
 
@@ -182,7 +189,7 @@ def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0) 
 def evaluate_all(com, out: Path, n_out: int = N_OUT, seed_out: int = SEED_OUT) -> pd.DataFrame:
     runs_dir = out / "runs"
     oos = sd.draw_scenarios(com, n=n_out, seed=seed_out)
-    bench = benchmark_costs(com, oos)
+    bench = benchmark_costs(com, oos, IR_RULE)
     rows = []
     for name in RUNS:
         folder = runs_dir / name
@@ -240,6 +247,7 @@ def main() -> None:
     ap.add_argument("--time-scale", type=float, default=1.0,
                     help="multiply every time limit (e.g. 0.05 for a quick test of the whole chain)")
     ap.add_argument("--out", default=None, help="output folder (default results/<community>/q3)")
+    ap.add_argument("--threads", type=int, default=0, help="Gurobi threads per run (0 = all cores; on HPC: the cores of the job)")
     ap.add_argument("--n-out", type=int, default=N_OUT)
     ap.add_argument("--seed-out", type=int, default=SEED_OUT)
     args = ap.parse_args()
@@ -256,7 +264,7 @@ def main() -> None:
         step1(com, out, args.n_out, args.seed_out)
     if args.runs:
         t0 = time.time()
-        run_all(com, out, args.only, args.force, args.time_scale)
+        run_all(com, out, args.only, args.force, args.time_scale, args.threads)
         print(f"runs finished in {(time.time() - t0) / 3600:.2f} h", flush=True)
     if args.evaluate:
         evaluate_all(com, out, args.n_out, args.seed_out)

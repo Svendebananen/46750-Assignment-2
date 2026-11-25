@@ -5,3 +5,4 @@ results/
 venv/
 .venv/
 .DS_Store
+hpc/logs/
