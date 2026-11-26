@@ -195,3 +195,88 @@ def plot_member_benefits(
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
+
+
+def plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_cost, dp_cost: float,
+                       output_dir: Path | str, tag: str = "q3_validation") -> Path:
+    """Question 3, validation in one figure.
+    (a) What the uncertainty does: the community's net reference demand (sum of the members' reference loads minus
+        their available PV) in every in-sample scenario, as a band (min-max over the scenarios) around the base case,
+        against the import cap. Net of PV so that it is comparable with the cap.
+    (b) That the model holds: each scenario's community cost in the SDP model (bars) and when its prices are replayed
+        by the out-of-sample evaluator (markers), against the deterministic DP on the expected parameters (line)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def net_demand(members):
+        return sum(np.asarray(m.reference_load) - (np.asarray(m.pv_available) if m.has_pv else 0.0) for m in members)
+
+    hours = np.arange(len(cap))
+    nets = np.array([net_demand(s.members) for s in scenarios])
+    base = net_demand(base_members)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8), gridspec_kw={"width_ratios": [1.6, 1]})
+    ax1.fill_between(hours, nets.min(axis=0), nets.max(axis=0), step="mid", color="tab:blue", alpha=0.25,
+                     label=f"Range over the {len(scenarios)} scenarios")
+    for k, n in enumerate(nets):
+        ax1.step(hours, n, where="mid", color="tab:blue", linewidth=0.7, alpha=0.6,
+                 label="One scenario" if k == 0 else None)
+    ax1.step(hours, base, where="mid", color="black", linewidth=1.8, label=r"Base case ($\theta = 1$)")
+    ax1.step(hours, cap, where="mid", color="tab:red", linestyle="--", linewidth=1.5, label="Import cap")
+    ax1.axhline(0, color="black", linewidth=0.6)
+    ax1.set(xlabel="hour", ylabel="kW", xticks=hours[::2],
+            title="(a) Net reference demand of the community (load - available PV)")
+    ax1.legend(fontsize=8, loc="upper left")
+    ax1.grid(alpha=0.3)
+
+    s = np.arange(len(in_model_cost))
+    ax2.bar(s, in_model_cost, 0.6, color="tab:blue", alpha=0.6, label="SDP, in the model")
+    ax2.plot(s, evaluator_cost, "D", color="black", markersize=6, label="Same prices, evaluator")
+    ax2.axhline(dp_cost, color="tab:gray", linestyle="--", linewidth=1.5, label="DP, expected parameters")
+    diff = float(np.max(np.abs(np.asarray(evaluator_cost) - np.asarray(in_model_cost))))
+    lo = min(np.min(in_model_cost), np.min(evaluator_cost), dp_cost)
+    hi = max(np.max(in_model_cost), np.max(evaluator_cost), dp_cost)
+    pad = 0.15 * (hi - lo) + 1.0
+    ax2.set(ylim=(lo - pad, hi + pad), xticks=s, xlabel="in-sample scenario", ylabel="community cost (DKK/day)",
+            title=f"(b) Cost per scenario (max difference {diff:.3f} DKK)")
+    ax2.legend(fontsize=8, loc="lower left")
+    ax2.grid(alpha=0.3, axis="y")
+    fig.tight_layout()
+    path = output_dir / f"{tag}.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
+
+
+def plot_q3_uncertainty_impact(ev, predicted_cost: float, predicted_surplus: float, output_dir: Path | str,
+                               label: str = "DP", tag: str = "q3_uncertainty_impact") -> Path:
+    """Question 3, step 1: a deterministic price vector replayed on out-of-sample scenarios.
+    x: the community's daily reference energy in the scenario minus the base case (kWh/day), i.e. how much more the
+    members want than declared. Top: realized community cost; bottom: the manager's surplus (payments - meter bill).
+    Colour: cap exceedance (kWh/day). Dashed: what the deterministic model predicts (expected parameters)."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dE, exc = ev["dE"].to_numpy(), ev["exceedance_kWh"].to_numpy()
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7.5), sharex=True)
+    vmax = max(float(exc.max()), 1e-3)
+    for ax, col, pred, name in ((ax1, "cost", predicted_cost, "community cost"),
+                                (ax2, "surplus", predicted_surplus, "manager surplus")):
+        y = ev[col].to_numpy()
+        sc = ax.scatter(dE, y, c=exc, cmap="Reds", vmin=0, vmax=vmax, edgecolor="black", linewidth=0.4, s=36, zorder=3)
+        ax.axhline(pred, color="tab:blue", linestyle="--", linewidth=1.5,
+                   label=f"{label} prediction (expected parameters): {pred:.1f} DKK")
+        ax.axhline(y.mean(), color="black", linestyle=":", linewidth=1.5,
+                   label=f"Realized mean over {len(y)} scenarios: {y.mean():.1f} DKK")
+        ax.set_ylabel(f"{name} (DKK/day)")
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=8, loc="upper left" if col == "cost" else "lower left")
+    ax1.set_title(f"(a) Realized community cost at the posted prices of {label}")
+    ax2.set_title("(b) Manager surplus (payments - meter bill); < 0 is a budget deficit")
+    ax2.axhline(0, color="black", linewidth=0.8)
+    ax2.set_xlabel("community reference energy minus base case (kWh/day): members want more than declared ->")
+    for ax in (ax1, ax2):
+        ax.axvline(0, color="gray", linewidth=0.8)
+    fig.colorbar(sc, ax=(ax1, ax2), pad=0.02, label="cap exceedance (kWh/day)")
+    path = output_dir / f"{tag}.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return path
