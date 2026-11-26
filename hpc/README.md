@@ -82,6 +82,33 @@ Each run prints `already solved, skipped` or `submitted (after <run>)`, and the 
 
 The jobs keep running after you log out. `bjobs` says `No unfinished job found` when everything is done.
 
+## Question 2: dynamic pricing
+
+Question 2 can use the same HPC environment. After following sections 1-2 above (including `bash hpc/setup_q3.sh`
+on an interactive node), submit the three `--DP --ir` variants as one LSF job:
+
+```bash
+cd ~/46750-Assignment-2
+bash hpc/submit_q2.sh
+```
+
+The submitted command is `python main.py --DP --ir` with `--time-limit` and `--threads` set from `hpc/config.sh`.
+`--ir` runs cap-only DP, budget-balanced DP, and budget-balanced DP with individual rationality; the configured
+time limit applies separately to each DP solve. The default is 3600 seconds per solve (up to three hours total)
+and a 3:30 job wall time. Adjust `Q2_TIME_LIMIT` or `Q2_WALL` there to suit the queue's limits. Logs are written to
+`hpc/logs/q2_dp_ir_<jobid>.out` and `.err`; result tables, plots, and model outputs go to `results/base/`.
+
+The HPC may improve the result by allowing longer solves and using the allocated cores, but a smaller reported
+MIP gap or a better objective is not guaranteed. Compare the final `MIP gap` and runtime in the output or
+`results/base/dynamic_q2_steps.csv` with the PC run. If a solve reaches its time limit, Gurobi will use its best
+available incumbent when one exists.
+
+To copy the Q2 outputs back to the PC, run this **on the PC** from the repository folder:
+
+```bash
+scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base results/
+```
+
 ## 5. Bring the results back (PC)
 
 Copy the new runs **from the PC**, then evaluate every run together and draw the figures there (about 3 min):

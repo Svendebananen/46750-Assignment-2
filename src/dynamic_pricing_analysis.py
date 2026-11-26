@@ -22,7 +22,8 @@ def solve_dp(com, args, lam_C, label: str, budget_balance: bool = False, ir_benc
         reg_weight=args.reg, reg_reference=lam_C if args.reg > 0 else None,
         time_limit=args.time_limit, budget_balance=budget_balance,
         ir_benchmark=ir_benchmark, ir_penalty=args.ir_penalty,
-        tight_M=args.tight_M, M_scale=args.M_scale, mip_focus=args.mip_focus, verbose=True).build()
+        tight_M=args.tight_M, M_scale=args.M_scale, mip_focus=args.mip_focus,
+        threads=args.threads, verbose=True).build()
     try:
         r = dp.solve()
     except RuntimeError as err:
