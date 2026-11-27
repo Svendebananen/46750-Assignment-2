@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .dynamic_pricing_plotting import (
+from .q2_plotting import (
     plot_dp_benefits_by_member,
     plot_dp_cap_sweep,
     plot_dp_compare_prices,

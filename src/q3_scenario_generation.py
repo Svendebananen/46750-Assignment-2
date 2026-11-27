@@ -18,7 +18,7 @@ Question 3 - uncertain preferences (two-stage, no time dimension)
 Data helpers
     day_data(app, bus, week, day)                      -> (appliance dict, bus dict) with the profiles of one day of weekly_profiles.json
 
-Run ``python -m src.scenario_generation`` (from the repository root) for a short demonstration.
+Run ``python -m src.q3_scenario_generation`` (from the repository root) for a short demonstration.
 """
 from __future__ import annotations
 

@@ -236,7 +236,7 @@ class CommunityModel:
         battery_end_soc_value_DKK_per_kWh: float = 0.0,
     ):
         if contract_mode is ContractMode.DYNAMIC:
-            from .dynamic_pricing_model import DynamicPricingCommunityModel
+            from .q2_model import DynamicPricingCommunityModel
 
             model_class = DynamicPricingCommunityModel
         else:
@@ -638,7 +638,7 @@ class CommunityContractCommunityModel(_CommunityModelBase):
         return gp.quicksum(member_terms) + meter_terms + self._battery_terminal_value()
 def __getattr__(name: str):
     if name in {"DynamicPricingCommunityModel", "internal_price_of_C"}:
-        from . import dynamic_pricing_model
+        from . import q2_model
 
-        return getattr(dynamic_pricing_model, name)
+        return getattr(q2_model, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

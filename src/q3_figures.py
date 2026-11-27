@@ -1,4 +1,4 @@
-"""Question 3: figures 2-4 from the saved runs of ``src.q3_experiments`` (no solving, a few seconds).
+"""Question 3: figures 2-4 from the saved runs of ``src.q3_analysis`` (no solving, a few seconds).
 
     python -m src.q3_figures                                      # results/base/q3/runs -> results/base/q3/
     python -m src.q3_figures --runs-dir results/base/q3/runs_benchR --tag benchR
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from .stochastic import risk_metrics
+from .q3_stochastic import risk_metrics
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 MODELS_FIG2 = ["DP_BB_IR", "SDPx_N5", "SDPcvar_N5", "SDPeps0_N5", "SDPeps20_N5", "SDPeps40_N5"]
@@ -205,13 +205,13 @@ def fig_scenarios_N(runs: dict, out: Path, tag: str = "") -> Path | None:
     return path
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--community", default="base")
     ap.add_argument("--runs-dir", default=None, help="default results/<community>/q3/runs")
     ap.add_argument("--out", default=None, help="default results/<community>/q3")
     ap.add_argument("--tag", default="", help="suffix of the file names, e.g. benchR")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     base = RESULTS_DIR / args.community / "q3"
     runs_dir = Path(args.runs_dir) if args.runs_dir else base / "runs"
     out = Path(args.out) if args.out else base

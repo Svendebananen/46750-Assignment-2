@@ -1,6 +1,6 @@
 # Question 3 on the DTU HPC
 
-The runs of `src/q3_experiments.py` as LSF jobs on the DTU HPC: one job per run, each started when the run it
+The runs of `src/q3_analysis.py` as LSF jobs on the DTU HPC: one job per run, each started when the run it
 starts from is done, so independent runs solve in parallel and the PC can be switched off. A last job evaluates
 every run on the 100 out-of-sample scenarios and draws figures 2-4.
 
@@ -116,7 +116,7 @@ Copy the new runs **from the PC**, then evaluate every run together and draw the
 ```bash
 scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N3 \
        <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N7 results/base/q3/runs/
-.venv/bin/python -m src.q3_experiments --evaluate
+.venv/bin/python -m src.q3_analysis --evaluate
 .venv/bin/python -m src.q3_figures
 ```
 
@@ -133,4 +133,4 @@ and some on the cluster. (The cluster's evaluation job does the same with the ru
 | `WALL` | 01:30 | wall time per job: 900 s start phase + 1800 s solve + margin |
 | `QUEUE` | hpc | |
 
-The time limits of the runs themselves are in `RUNS` of `src/q3_experiments.py`; raise `WALL` with them.
+The time limits of the runs themselves are in `RUNS` of `src/q3_analysis.py`; raise `WALL` with them.

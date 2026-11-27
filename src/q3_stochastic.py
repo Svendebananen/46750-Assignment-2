@@ -35,7 +35,7 @@ import numpy as np
 import pandas as pd
 from gurobipy import GRB
 
-from . import scenario_data as sd
+from . import q3_scenario_data as sd
 from .data_loader import CommunityData
 from .model import (CommunityContractCommunityModel, DynamicPricingCommunityModel, IndividualContractCommunityModel,
                     NoContractCommunityModel)
@@ -120,7 +120,7 @@ class StochasticDynamicPricingModel:
     """SDP: one price vector, one lower level (C's flows + the members' KKT systems) per scenario.
 
     com            : the loaded community (prices, PV, contract); the members of each scenario come from ``scenarios``
-    scenarios      : list of ``scenario_data.Scenario`` (probabilities must sum to one)
+    scenarios      : list of ``q3_scenario_data.Scenario`` (probabilities must sum to one)
     objective      : "expectation" or "cvar" (cvar_alpha = share of worst scenarios, cvar_weight = w in [0, 1])
     constraints    : "expectation" or "chance" (epsilon = allowed probability of violation; 0 = every scenario)
     budget_balance : impose the budget-balance requirement (in the sense of ``constraints``), up to bb_tol DKK

@@ -1,10 +1,10 @@
 """Question 3: numerical experiments.
 
-    python -m src.q3_experiments --step1               # DP's prices replayed on the out-of-sample scenarios (figure 1)
-    python -m src.q3_experiments --runs                # solve every model of RUNS (about 4 h), skipping finished ones
-    python -m src.q3_experiments --evaluate            # every finished run on the out-of-sample set + comparison table
-    python -m src.q3_experiments --runs --evaluate     # both (the overnight command)
-    python -m src.q3_experiments --list                # the runs and whether they are finished
+    python -m src.q3_analysis --step1               # DP's prices replayed on the out-of-sample scenarios (figure 1)
+    python -m src.q3_analysis --runs                # solve every model of RUNS (about 4 h), skipping finished ones
+    python -m src.q3_analysis --evaluate            # every finished run on the out-of-sample set + comparison table
+    python -m src.q3_analysis --runs --evaluate     # both (the overnight command)
+    python -m src.q3_analysis --list                # the runs and whether they are finished
 
 Seeds (report them): in-sample scenarios seed 1 (N = 3, 5, 7, 10; nested: the first N of a larger set are the
 smaller set),
@@ -39,11 +39,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import scenario_data as sd
+from . import q3_scenario_data as sd
 from .data_loader import load_community
 from .model import CommunityContractCommunityModel, DynamicPricingCommunityModel, internal_price_of_C
 from .plotting import plot_q3_uncertainty_impact
-from .stochastic import StochasticDynamicPricingModel, benchmark_costs, evaluate_prices, risk_metrics
+from .q3_stochastic import StochasticDynamicPricingModel, benchmark_costs, evaluate_prices, risk_metrics
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 SEED_IN, SEED_OUT, N_OUT = 1, 1000, 100
@@ -170,6 +170,7 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
 def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0, threads: int = 0) -> None:
     runs_dir = out / "runs"
     lam = c_prices(com)
+    failures = []
     for name, cfg in RUNS.items():
         if only and name not in only:
             continue
@@ -181,6 +182,9 @@ def run_all(com, out: Path, only=None, force: bool = False, scale: float = 1.0, 
             solve_run(com, name, cfg, runs_dir, lam, scale, threads)
         except Exception as err:                       # keep going: later runs may not depend on this one
             print(f"[{name}] FAILED: {err}", flush=True)
+            failures.append(f"{name}: {err}")
+    if failures:
+        raise RuntimeError("Question 3 runs failed:\n" + "\n".join(failures))
 
 
 # ----------------------------------------------------------------------------------------------------------------------

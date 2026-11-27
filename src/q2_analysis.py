@@ -6,8 +6,8 @@ from pathlib import Path
 import pandas as pd
 
 from .data_loader import CommunityData
-from .dynamic_pricing_model import DynamicPricingCommunityModel, internal_price_of_C
-from .dynamic_pricing_plotting import (
+from .q2_model import DynamicPricingCommunityModel, internal_price_of_C
+from .q2_plotting import (
     DynamicPricingPlotter,
 )
 from .model import CommunityModel, ContractMode

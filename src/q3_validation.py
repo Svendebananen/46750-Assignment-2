@@ -29,12 +29,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import scenario_data as sd
-from . import scenario_generation as sg
+from . import q3_scenario_data as sd
+from . import q3_scenario_generation as sg
 from .data_loader import load_community
 from .model import CommunityContractCommunityModel, DynamicPricingCommunityModel, internal_price_of_C
 from .plotting import plot_q3_validation
-from .stochastic import StochasticDynamicPricingModel, evaluate_prices
+from .q3_stochastic import StochasticDynamicPricingModel, evaluate_prices
 
 TOL = 1e-6
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
@@ -90,14 +90,14 @@ def v1_scenarios(com, n: int, seed: int) -> bool:
                  f"indices: {ok_index}, nested in N={2 * n}: {ok_nested}")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--community", default="base")
     ap.add_argument("--time-limit", type=float, default=300.0)
     ap.add_argument("--n", type=int, default=5, help="in-sample scenarios of V5/V6")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--only", nargs="*", default=None)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     run = lambda k: args.only is None or k in args.only
     TL = args.time_limit
     out = RESULTS_DIR / args.community / "q3"
@@ -107,6 +107,15 @@ def main() -> None:
 
     if run("V1"):
         results["V1"] = v1_scenarios(com, args.n, args.seed)
+
+    if not any(run(k) for k in ("V2", "V3", "V4", "V5", "V6")):
+        csv, tex = write_table(ROWS, out)
+        print(f"{sum(results.values())}/{len(results)} checks passed: "
+              + " ".join(f"{k}={'ok' if ok else 'FAIL'}" for k, ok in results.items()))
+        print(f"table: {csv}\n       {tex}")
+        if not all(results.values()):
+            raise SystemExit(1)
+        return
 
     C = CommunityContractCommunityModel(com).build()
     rC = C.solve()
@@ -180,6 +189,8 @@ def main() -> None:
     print(f"\n{sum(results.values())}/{len(results)} checks passed: "
           + " ".join(f"{k}={'ok' if ok else 'FAIL'}" for k, ok in results.items()))
     print(f"table: {csv}\n       {tex}")
+    if not all(results.values()):
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
