@@ -74,10 +74,10 @@ def main() -> None:
     ap.add_argument("--time-limit", type=float, default=None)
     ap.add_argument("--bb", action="store_true", help="DP: impose budget balance")
     ap.add_argument("--ir", action="store_true", help="DP: impose soft individual rationality (also adds budget balance)")
-    ap.add_argument("--ir-penalty", type=float, default=100.0, help="DP: penalty per DKK of IR slack")
+    ap.add_argument("--ir-penalty", type=float, default=0.6, help="DP: penalty per DKK of IR slack")
     ap.add_argument("--threads", type=int, default=0, help="DP: Gurobi threads (0 = Gurobi default)")
     ap.add_argument("--tight-M", action="store_true", help="DP: use one M per complementarity set")
-    ap.add_argument("--M-scale", type=float, default=1.0, help="DP: safety factor on the per-set M values")
+    ap.add_argument("--M-scale", type=float, default=1.2, help="DP: safety factor on the per-set M values")
     ap.add_argument(
         "--mip-focus",
         type=int,
