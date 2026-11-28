@@ -226,12 +226,12 @@ def run_dp_case(com, args, out, plots: bool = True) -> list[dict]:
                      "members worse off": int(worse.sum()), "loss of members worse off": float(-mt.loc[worse, "benefit"].sum()),
                      "sum zeta": float(mt["zeta"].sum()) if mt["zeta"].notna().any() else float("nan"),
                      "MIP gap": r.meta["mip_gap"]})
-        mt.to_csv(out / f"{r.question}_{tags[label]}_members.csv", index=False)
+        mt.to_csv(out / f"q2_{r.question}_{tags[label]}_members.csv", index=False)
         r.save(out, tag=tags[label])
         meta = {k: v for k, v in r.meta.items() if k != "validation"}
         meta["validation"] = {k: v for k, v in r.meta["validation"].items() if k != "indifferent_pairs"}
         meta["validation"]["indifferent_pairs"] = len(r.meta["validation"]["indifferent_pairs"])
-        (out / f"{r.question}_{tags[label]}_meta.json").write_text(
+        (out / f"q2_{r.question}_{tags[label]}_meta.json").write_text(
             json.dumps(meta, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)), encoding="utf-8")
     table: pd.DataFrame = pd.DataFrame(rows)
     reference_welfare = rows[0]["welfare cost"]
@@ -245,7 +245,7 @@ def run_dp_case(com, args, out, plots: bool = True) -> list[dict]:
     order = [m.consumer_id for m in member_order(com.members)]
     shifts = {STEP_NAMES[l]: pd.DataFrame(r.meta["member_shift"]).T.loc[order] for l, r in runs.items()}
     for l, r in runs.items():
-        shifts[STEP_NAMES[l]].to_csv(out / f"{r.question}_{tags[l]}_member_shift.csv", index_label="member")
+        shifts[STEP_NAMES[l]].to_csv(out / f"q2_{r.question}_{tags[l]}_member_shift.csv", index_label="member")
 
     pd.set_option("display.width", 250)
     pd.set_option("display.max_columns", 40)
@@ -295,7 +295,7 @@ def run_dp_case(com, args, out, plots: bool = True) -> list[dict]:
 def run_dp(com, args, results_dir: Path) -> None:
     """Question 2. One --cap-f value: the steps on that contract. Several: the same for every value + the sweep."""
     import pandas as pd
-    out = results_dir / args.community
+    out = results_dir
     if len(args.cap_f) == 1:
         f = args.cap_f[0]
         run_dp_case(scaled_cap(com, f) if f != 1.3 else com, args, out if f == 1.3 else out / f"cap_f{f:.2f}")

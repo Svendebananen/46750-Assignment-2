@@ -36,7 +36,9 @@ class Results:
     def save(self, folder: Path | str, tag: str = "") -> None:
         folder = Path(folder)
         folder.mkdir(parents=True, exist_ok=True)
-        stem = f"{self.question}{'_' + tag if tag else ''}"
+        mode = self.meta.get("contract_mode")
+        question = "q2" if mode == "dynamic" else "q1"
+        stem = "_".join(part for part in (question, self.question, tag) if part)
         self.hourly.to_csv(folder / f"{stem}_hourly.csv", index_label="hour")
         with open(folder / f"{stem}_summary.txt", "w", encoding="utf-8") as f:
             f.write(f"status    : {self.status}\nobjective : {self.objective:.4f} DKK\n")

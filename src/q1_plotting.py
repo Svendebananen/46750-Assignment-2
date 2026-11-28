@@ -35,7 +35,7 @@ def plot_results(
         "community": "C: community contract",
         "dynamic": "DP: dynamic pricing",
     }.get(mode, mode)
-    stem = result.question + (f"_{tag}" if tag else "")
+    stem = "_".join(part for part in ("q1", result.question, tag) if part)
 
     dispatch_path = output_dir / f"{stem}_dispatch.png"
     fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -172,7 +172,7 @@ def plot_member_benefits(
     ax.grid(axis="y", alpha=0.25)
     ax.legend(title="Member", ncol=2)
     fig.tight_layout()
-    path = output_dir / f"{contract_result.question}_member_benefits.png"
+    path = output_dir / "q1_member_benefits.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path

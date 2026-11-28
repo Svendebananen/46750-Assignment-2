@@ -65,7 +65,8 @@ def plot_dp_prices(result: "Results", lambda_C: list[float], community, output_d
     ax2.grid(True, alpha=0.25)
     ax2.legend()
     fig.tight_layout()
-    path = output_dir / f"{result.question}{'_' + tag if tag else ''}_prices.png"
+    stem = "_".join(part for part in ("q2", result.question, tag) if part)
+    path = output_dir / f"{stem}_prices.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
@@ -103,7 +104,7 @@ def plot_dp_compare_prices(runs: dict, lambda_C: list[float], community, output_
         ax.grid(True, alpha=0.25)
         ax.legend()
     fig.tight_layout()
-    path = output_dir / f"{first.question}_{tag}_prices.png"
+    path = output_dir / f"q2_{first.question}_{tag}_prices.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
@@ -165,7 +166,8 @@ def plot_dp_cost_of_requirements(table, output_dir: Path | str, tag: str = "dyna
     for ax in (ax1, ax2):
         ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    path = output_dir / f"{tag}_cost_of_requirements.png"
+    stem = "q2" if tag.startswith("q2") else f"q2_{tag}"
+    path = output_dir / f"{stem}_cost_of_requirements.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
@@ -201,7 +203,8 @@ def plot_dp_benefits_by_member(tables: dict, benchmark: str, output_dir: Path | 
     ax.grid(axis="y", alpha=0.25)
     ax.legend()
     fig.tight_layout()
-    path = output_dir / f"{tag}_member_benefits.png"
+    stem = "q2" if tag.startswith("q2") else f"q2_{tag}"
+    path = output_dir / f"{stem}_member_benefits.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
@@ -243,7 +246,8 @@ def plot_dp_cap_sweep(sweep, output_dir: Path | str, tag: str = "dynamic_q2") ->
         ax.grid(True, alpha=0.25)
         ax.legend()
     fig.tight_layout()
-    path = output_dir / f"{tag}_cap_sweep.png"
+    stem = "q2" if tag.startswith("q2") else f"q2_{tag}"
+    path = output_dir / f"{stem}_cap_sweep.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path
@@ -284,7 +288,8 @@ def plot_dp_shift_heatmap(shifts: dict, assets: dict, cap, imports: dict, output
             for t in hours[over]:
                 ax.add_patch(Rectangle((t - 0.5, -0.5), 1, len(ids), fill=False, edgecolor="black", linewidth=1.5))
     fig.tight_layout()
-    path = output_dir / f"{tag}_member_shift.png"
+    stem = "q2" if tag.startswith("q2") else f"q2_{tag}"
+    path = output_dir / f"{stem}_member_shift.png"
     fig.savefig(path, dpi=160)
     plt.close(fig)
     return path

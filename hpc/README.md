@@ -118,7 +118,7 @@ Run these copy commands **on the PC**, from the repository folder.
 Copy the results directory from the cluster:
 
 ```bash
-scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base results/
+scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base results_HPC/
 ```
 
 This includes Question 2 result tables, plots, and model outputs in `results/base/`.

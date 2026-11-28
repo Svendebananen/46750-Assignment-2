@@ -172,14 +172,17 @@ def main() -> None:
             if consumer_id in community.member_ids
         ),
     )
-    (RESULTS_DIR / args.community).mkdir(parents=True, exist_ok=True)
+    community_output = RESULTS_DIR / args.community
+    community_output.mkdir(parents=True, exist_ok=True)
 
     if args.demo:
         import runpy
 
         runpy.run_module("src.q3_scenario_generation", run_name="__main__")
     if args.DP:
-        DynamicPricingExperiment(RESULTS_DIR).run(community, args)
+        q2_out = community_output / "q2"
+        q2_out.mkdir(parents=True, exist_ok=True)
+        DynamicPricingExperiment(q2_out).run(community, args)
     if args.R or args.I or args.C:
         mode = (
             ContractMode.COMMUNITY
@@ -194,12 +197,14 @@ def main() -> None:
             battery_end_soc_value_DKK_per_kWh=args.battery_end_value,
         ).build().solve()
         print(result)
-        result.save(RESULTS_DIR / args.community, tag=mode.value)
+        q1_out = community_output / "q1"
+        q1_out.mkdir(parents=True, exist_ok=True)
+        result.save(q1_out, tag=mode.value)
         plot_paths = plot_results(
             result,
             community.contract,
             community.energy_price,
-            RESULTS_DIR / args.community,
+            q1_out,
         )
         print("Plots written:")
         for path in plot_paths:
@@ -214,11 +219,13 @@ def main() -> None:
                 reference,
                 result,
                 community.members,
-                RESULTS_DIR / args.community,
+                q1_out,
             )
             print(f"  {benefit_path}")
     if args.q1 or args.q1_base or args.q1_sweep or args.q1_settlement:
-        Question1Experiment(RESULTS_DIR).run(community, args)
+        q1_out = community_output / "q1"
+        q1_out.mkdir(parents=True, exist_ok=True)
+        Question1Experiment(q1_out).run(community, args)
     if args.q3_list:
         from src.q3_analysis import RUNS, run_done
 

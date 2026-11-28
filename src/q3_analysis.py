@@ -104,9 +104,9 @@ def step1(com, out: Path, n_out: int = N_OUT, seed_out: int = SEED_OUT) -> pd.Da
     ev["dE"] = ev["reference_energy_kWh"] - sum(m.reference_load.sum() for m in com.members)
     metrics = pd.DataFrame([{"model": "DP", "predicted_cost": r.meta["welfare_cost"],
                              "predicted_surplus": r.meta["manager_surplus"], **risk_metrics(ev, mem)}])
-    ev.to_csv(out / "step1_dp_oos_scenarios.csv", index=False)
-    mem.to_csv(out / "step1_dp_oos_members.csv", index=False)
-    metrics.to_csv(out / "step1_dp_oos_metrics.csv", index=False)
+    ev.to_csv(out / "q3_step1_dp_oos_scenarios.csv", index=False)
+    mem.to_csv(out / "q3_step1_dp_oos_members.csv", index=False)
+    metrics.to_csv(out / "q3_step1_dp_oos_metrics.csv", index=False)
     fig = plot_q3_uncertainty_impact(ev, r.meta["welfare_cost"], r.meta["manager_surplus"], out)
     print(metrics.T.round(3).to_string(header=False))
     print(f"figure: {fig}")
@@ -121,11 +121,11 @@ def in_sample(com, n: int, seed: int = SEED_IN) -> list[sd.Scenario]:
 
 
 def run_done(folder: Path) -> bool:
-    return (folder / "meta.json").exists() and (folder / "prices.csv").exists()
+    return (folder / "q3_meta.json").exists() and (folder / "q3_prices.csv").exists()
 
 
 def load_prices(folder: Path) -> np.ndarray:
-    return pd.read_csv(folder / "prices.csv")["price"].to_numpy()
+    return pd.read_csv(folder / "q3_prices.csv")["price"].to_numpy()
 
 
 def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0, threads: int = 0) -> None:
@@ -142,7 +142,7 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
             raise RuntimeError(f"{name} starts from {cfg['start']}, which has not been solved")
         start = load_prices(start_dir)
         if cfg.get("start_core"):
-            core = np.load(start_dir / "core_solution.npy")
+            core = np.load(start_dir / "q3_core_solution.npy")
     tl = cfg["time_limit"] * scale
     model = StochasticDynamicPricingModel(
         com, scen, name=name, budget_balance=True, ir_benchmark=bench, reg_reference=lam, time_limit=tl,
@@ -152,16 +152,16 @@ def solve_run(com, name: str, cfg: dict, runs_dir: Path, lam, scale: float = 1.0
     folder.mkdir(parents=True, exist_ok=True)
     model.m.Params.OutputFlag = 1                      # log to the file only (verbose=False turns logging off)
     model.m.Params.LogToConsole = 0
-    model.m.Params.LogFile = str(folder / "gurobi.log")
+    model.m.Params.LogFile = str(folder / "q3_gurobi.log")
     t0 = time.time()
     r = model.solve()
-    pd.DataFrame({"hour": list(model.T), "price": r.prices}).to_csv(folder / "prices.csv", index=False)
-    np.save(folder / "core_solution.npy", model.core_solution())
-    r.scenarios.to_csv(folder / "in_sample_scenarios.csv", index=False)
-    r.members.to_csv(folder / "in_sample_members.csv", index=False)
+    pd.DataFrame({"hour": list(model.T), "price": r.prices}).to_csv(folder / "q3_prices.csv", index=False)
+    np.save(folder / "q3_core_solution.npy", model.core_solution())
+    r.scenarios.to_csv(folder / "q3_in_sample_scenarios.csv", index=False)
+    r.members.to_csv(folder / "q3_in_sample_members.csv", index=False)
     meta = {"name": name, "label": cfg["label"], "config": cfg, "status": r.status, "objective": r.objective,
             "wall_time_s": time.time() - t0, "seed_in": SEED_IN, "ir_rule": IR_RULE, **r.meta}
-    (folder / "meta.json").write_text(json.dumps(meta, indent=1, default=lambda o: o.tolist()
+    (folder / "q3_meta.json").write_text(json.dumps(meta, indent=1, default=lambda o: o.tolist()
                                                  if hasattr(o, "tolist") else str(o)), encoding="utf-8")
     ws = r.meta.get("warm_start") or {}
     print(f"[{name}] {r.summary()} | start found {ws.get('found')}, used {ws.get('start_used')}", flush=True)
@@ -199,11 +199,11 @@ def evaluate_all(com, out: Path, n_out: int = N_OUT, seed_out: int = SEED_OUT) -
         folder = runs_dir / name
         if not run_done(folder):
             continue
-        meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+        meta = json.loads((folder / "q3_meta.json").read_text(encoding="utf-8"))
         ev, mem = evaluate_prices(com, load_prices(folder), oos, benchmark=bench, label=name)
-        ev.to_csv(folder / "oos_scenarios.csv", index=False)
-        mem.to_csv(folder / "oos_members.csv", index=False)
-        ins = risk_metrics(pd.read_csv(folder / "in_sample_scenarios.csv"), pd.read_csv(folder / "in_sample_members.csv"))
+        ev.to_csv(folder / "q3_oos_scenarios.csv", index=False)
+        mem.to_csv(folder / "q3_oos_members.csv", index=False)
+        ins = risk_metrics(pd.read_csv(folder / "q3_in_sample_scenarios.csv"), pd.read_csv(folder / "q3_in_sample_members.csv"))
         oo = risk_metrics(ev, mem)
         size = meta.get("size", {})
         rows.append({"model": name, "label": meta["label"], "N": meta["config"]["n"], "status": meta["status"],

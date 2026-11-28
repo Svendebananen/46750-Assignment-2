@@ -224,7 +224,7 @@ class Question1Experiment:
             self.results_dir = Path(results_dir)
 
         def run(self, community, args) -> None:
-            output_dir = self.results_dir / args.community
+            output_dir = self.results_dir
             output_dir.mkdir(parents=True, exist_ok=True)
             plotter = Question1Plotter(output_dir)
 

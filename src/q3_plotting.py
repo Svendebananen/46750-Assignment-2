@@ -36,13 +36,13 @@ IN_STYLE = dict(marker="D", color="black", markersize=7, linestyle="none", zorde
 
 def load_run(folder: Path) -> dict | None:
     """Everything a figure needs from one run folder, or None if it has not been evaluated out of sample."""
-    if not (folder / "oos_scenarios.csv").exists():
+    if not (folder / "q3_oos_scenarios.csv").exists():
         return None
-    meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
+    meta = json.loads((folder / "q3_meta.json").read_text(encoding="utf-8"))
     run = {"meta": meta, "label": meta["label"], "N": meta["config"]["n"]}
     for part in ("in_sample", "oos"):
-        scen = pd.read_csv(folder / f"{part}_scenarios.csv")
-        mem = pd.read_csv(folder / f"{part}_members.csv")
+        scen = pd.read_csv(folder / f"q3_{part}_scenarios.csv")
+        mem = pd.read_csv(folder / f"q3_{part}_members.csv")
         ir = mem.groupby("scenario")["ir_violation"].sum().reindex(scen["scenario"]).to_numpy()
         scen = scen.assign(ir_violation=ir)
         run[part] = scen
@@ -210,6 +210,7 @@ def plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_co
     """Plot scenario demand variation and the model/evaluator cost validation."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    tag = tag if tag.startswith("q3_") else f"q3_{tag or 'validation'}"
 
     def net_demand(members):
         return sum(np.asarray(m.reference_load) - (np.asarray(m.pv_available) if m.has_pv else 0.0) for m in members)
@@ -255,6 +256,7 @@ def plot_q3_uncertainty_impact(ev, predicted_cost: float, predicted_surplus: flo
     """Plot realized cost and manager surplus against out-of-sample uncertainty."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    tag = tag if tag.startswith("q3_") else f"q3_{tag or 'uncertainty_impact'}"
     dE, exc = ev["dE"].to_numpy(), ev["exceedance_kWh"].to_numpy()
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7.5), sharex=True)
     vmax = max(float(exc.max()), 1e-3)

@@ -44,8 +44,9 @@ default solver limits; use `--q3-validation --q3-validation-only V1 V2` or
 `--q3-validation --q3-validation-time-limit 60` to shorten it. The old `--test`, `--test-only`, and
 `--test-time-limit` validation options remain accepted as aliases.
 
-Results and figures are written under `results/<community>/`. The default community is `base`; select another
-community file with `--community NAME`, or load a different day with `--day d1` through `--day d7` for the
+Results and figures are written under `results/<community>/q1`, `results/<community>/q2`, and
+`results/<community>/q3`, according to the question that produced them. The default community is `base`; select
+another community file with `--community NAME`, or load a different day with `--day d1` through `--day d7` for the
 deterministic models. The stochastic Question 3 study uses day `d1`.
 
 ## Project layout

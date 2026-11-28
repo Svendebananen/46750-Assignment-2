@@ -175,6 +175,8 @@ def save_scenarios(scenarios: list[Scenario], path: Path | str, seed: int | None
     """Write one row per (scenario, member): seed, scenario id, probability, consumer, theta of each quantity, index of the
     draw taken, reference energy (kWh) and disutility slope (DKK/kWh). Enough to reproduce and trace every scenario."""
     path = Path(path)
+    if path.suffix.lower() in {".csv", ".txt"} and not path.name.startswith("q3_"):
+        path = path.with_name(f"q3_{path.name}")
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
