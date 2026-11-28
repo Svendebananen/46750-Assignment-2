@@ -54,8 +54,11 @@ IR_RULE = "best"          # IR benchmark: "best" = min(R, I) per member and scen
 RUNS: dict[str, dict] = {
     "DP_BB": dict(label=r"$\mathcal{DP}^{BB}$", n=0, ir=False, time_limit=600),
     "DP_BB_IR": dict(label=r"$\mathcal{DP}^{BB,IR}$", n=0, ir=True, time_limit=1200, start="DP_BB"),
-    "SDPx_N5": dict(label=r"$\mathcal{SDP}^{x}$, N=5", n=5, time_limit=1800, start="DP_BB_IR", box=0.05,
-                    start_time_limit=300),
+    # starts from the kappa^IR = 100 solution on the same scenarios: kappa only enters the objective, so that solution
+    # is feasible here, while the DP_BB_IR prices +- 0.05 gave no feasible point in 2100 s with kappa^IR = 0.6.
+    # runs/SDPx_N5_kappa100 = the old runs/SDPx_N5 (kappa 100) with core_solution.npy, prices.csv, meta.json renamed q3_*
+    "SDPx_N5": dict(label=r"$\mathcal{SDP}^{x}$, N=5", n=5, time_limit=1800, start="SDPx_N5_kappa100",
+                    start_core=True, start_time_limit=300),
     "SDPcvar_N5": dict(label=r"$\mathcal{SDP}^{CVaR}$, N=5", n=5, objective="cvar", cvar_alpha=0.2, cvar_weight=0.5,
                        time_limit=1800, start="SDPx_N5", start_core=True),
     "SDPeps0_N5": dict(label=r"$\mathcal{SDP}^{\varepsilon=0}$, N=5", n=5, constraints="chance", epsilon=0.0,
