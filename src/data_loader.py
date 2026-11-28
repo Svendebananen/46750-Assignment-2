@@ -16,7 +16,7 @@ catalogue) and ``bus_params.json`` (connection point: prices and tariffs) -- the
 (the Assignment 1 case-file format: ``consumers[]`` with ``consumer_id``, ``connection_bus``, ``list_appliances``; only the base
 community is shipped -- variations of the member mix are built in code or as your own file of the same format),
 ``weekly_profiles.json`` (seven days of prices, PV ratios and reference load factors), ``dso_contract_params.json`` (the
-contract) and the uncertainty file of Question 3 (read by ``src/scenario_generation.py``).
+contract) and the uncertainty file of Question 3 (read by ``src.q3_scenario_generation``).
 
 The :class:`InputData` class is the one of the Assignment 1 starter repository, unchanged, so that the models you wrote
 there run on every member as they are. The only difference with Assignment 1 is that a member may have no PV system
@@ -396,6 +396,10 @@ def _contract(dso: dict, members: list[InputData], day: str, community_is_base: 
         share = {cid: float(share_file[cid]) for cid in ids}; rule = "energy_net"
     else:   # another member mix: R differs from the file's; recompute the net-import shares with your model R (placeholder: capacity rule)
         tot = sum(maxcap.values()); share = {cid: maxcap[cid] / tot for cid in ids}; net = None; rule = "capacity"
+    total_share = sum(share.values())
+    if total_share <= 0:
+        raise ValueError("Individual contract shares must sum to a positive value")
+    share = {cid: value / total_share for cid, value in share.items()}
     return ContractData(
         day=day,
         tariff_discount_ratio=float(dso["tariff_discount_ratio"]),

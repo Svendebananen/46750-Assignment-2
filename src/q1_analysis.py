@@ -1,6 +1,6 @@
 """Question 1: comparison of R, I and C, contract sensitivity and settlement of C.
 
-The functions here only compute numbers and tables; the figures are drawn in plotting.py and every experiment is
+The functions here only compute numbers and tables; the figures are drawn in q1_plotting.py and every experiment is
 started from main.py using ``python main.py --q1``.
 """
 from __future__ import annotations
@@ -224,7 +224,7 @@ class Question1Experiment:
             self.results_dir = Path(results_dir)
 
         def run(self, community, args) -> None:
-            output_dir = self.results_dir / args.community
+            output_dir = self.results_dir
             output_dir.mkdir(parents=True, exist_ok=True)
             plotter = Question1Plotter(output_dir)
 

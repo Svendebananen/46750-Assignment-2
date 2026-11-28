@@ -1,408 +1,302 @@
-# 46750 - Assignment 2: An Energy Community as a Flexibility Provider
+# 46750 — Assignment 2
 
-Starter package for **Group Assignment 2** of *46750 - Optimization in Modern Power Systems* (DTU).
-It contains the input data of every question (in `data/`), the Assignment 1 data loader extended to a
-community and the scenario-generation utilities for Question 3 (in `src/`), and the instructions below.
-The Question 3 scenario-generation utilities are provided, but there is currently no Question 3 optimization
-experiment in the command-line interface.
-The assignment text (*Assignment 2 - Instructions* in DTU Learn) is the reference for the questions; this
-README documents the data and the code conventions.
+The project includes the community data, contract and dispatch models, dynamic pricing, and stochastic pricing experiments for all three assignment questions.
 
-**Getting your own copy.** Download the package from DTU Learn (or use the template repository, if one is
-announced, with **Use this template -> Create a new repository**). Using the Python code is recommended but
-not required; the input data in `data/` must be used as provided, and the scenarios of Question 3
-must be drawn with the rules of the uncertainty file (the module in `src/` implements them exactly).
+## Setup
 
-**Submitting your code.** As in Assignment 1: attach your complete project code as a single `.zip` to your
-submission in DTU Learn, or give the link to your group's repository on the front page of your report
-(accessible to the graders, not modified after the deadline). The README must let the graders reproduce
-every number and figure of the report with one command per experiment; the scenarios you generate and any
-data you add are part of the code deliverable and must be documented here.
+Use Python 3.11 or later. From the repository root:
 
-## 1. Setup
-
-### 1.1 Python environment
-
-Use one of the two options (both install the same packages).
-
-**Option A - pip and venv**
-```sh
-python -m venv venv
-```
-
-Activate the environment using the command for your shell:
-
-```sh
-source venv/bin/activate             # macOS / Linux
-```
-```bat
-venv\Scripts\activate.bat            rem Windows Command Prompt
-```
-```powershell
-.\venv\Scripts\Activate.ps1          # Windows PowerShell
-```
-
-Then install the dependencies:
-```sh
+```bash
+python -m venv .venv
+source .venv/bin/activate              # Windows: .venv\Scripts\activate
 python -m pip install -r requirements.txt
 ```
 
-**Option B - conda**
-```bash
-conda env create -f environment.yaml
-conda activate 46750-a2
-```
+Alternatively, create the Conda environment with `conda env create -f environment.yaml` and activate it with
+`conda activate 46750-a2`.
 
-### 1.2 Gurobi licence
+Solving the full community models requires an active Gurobi academic or unrestricted license. Follow Gurobi's
+[academic license instructions](https://www.gurobi.com/academia/academic-program-and-licenses/). The license bundled
+with the package is size-limited and cannot solve the full community models.
 
-The model-solving commands use [Gurobi](https://www.gurobi.com) through the `gurobipy` package and need a
-valid Gurobi licence. Request the free [academic licence](https://www.gurobi.com/academia/academic-program-and-licenses/)
-with your DTU e-mail and activate it with `grbgetkey <your-key>` (on the DTU network or VPN). The dynamic-pricing
-model (`--DP`) reformulates member LP optimality conditions with complementarity constraints, using big-M by
-default or SOS1 when requested; its default MIP gap is 0.001. `--time-limit` can set a solver time limit.
-Question 3 scenario generation does not currently solve an optimization model.
+## Run the questions
 
-### 1.3 Check that everything works
-```bash
-python main.py                  # loads the base case (16 members, day d1) and prints a summary
-python main.py --members        # ... plus the Assignment 1 summary of every member
-python main.py --demo           # ... plus the scenario-generation demonstration (Question 3)
-python main.py --R              # solve a model and verify that Gurobi is available/licensed
-```
+`main.py` is the command-line entry point. Use `python main.py --help` for all options.
 
-## 2. Repository structure
-
-```
-main.py                        Entry point: load a community -> summarize, run R/I/C or delegate an experiment
-src/
-  data_loader.py               load_community("base", day="d1") -> CommunityData:
-                                 .members     one Assignment 1 InputData per member (same attribute names as in Assignment 1)
-                                 .contract    ContractData: cap, penalty, discount, individual caps and shares of model I
-  scenario_generation.py       Question 3: independent preference scenarios per member, merged into joint scenarios (numpy only)
-  analysis_q1.py               Question 1: calculations and experiment runner for comparison, sensitivity, settlement
-  q1_plotting.py               Question 1: sensitivity and settlement figures
-  dynamic_pricing_model.py     Question 2: dynamic-pricing optimization model
-  dynamic_pricing_analysis.py  Question 2: experiment runner and result reporting
-  dynamic_pricing_plotting.py  Question 2: figures
-  plotting.py                  Shared dispatch and contract figures
-data/
-  appliance_params.json        SHARED catalogue (Assignment 1 format): the loads FL_L1-FL_L4 (linear disutility 0.25-2.0 DKK/kWh), PV_01_S, BAT_01_S
-  bus_params.json              SHARED connection point: day-1 prices and the grid tariffs (unchanged from Assignment 1)
-  weekly_profiles.json         Seven days d1-d7 of prices, PV availability ratios and reference load factors
-  params_community_base.json   The base-case community (16 members: 4 slopes x 4 asset classes) - the Assignment 1 case-file format (the only community shipped)
-  dso_contract_params.json     The capacity limitation contract and the individual contracts of the benchmark model I
-  preference_uncertainty_params.json   Question 3: uncertainty about the members' preference parameters
-  community_base_case.png/.svg, setup_R.png/.svg, setup_I.png/.svg   Figures 1-3 of the assignment (reference, individual contracts, community contract; schematic)
-  fig_q3_scenarios.png/.svg    Figure 4 of the assignment (how the scenarios of Question 3 are generated)
-results/                       Written by your code (git-ignored)
-requirements.txt, environment.yaml, .gitignore
-```
-
-The model in `src/model.py` uses the Assignment 1 `InputData` for every member. `CommunityModel`
-is indexed by member and hour and uses `ContractMode.NONE` for the reference case R and
-`ContractMode.INDIVIDUAL` for model I. The three contract modes are implemented as separate
-community-model classes behind the same `CommunityModel` construction API; `ContractMode.COMMUNITY`
-uses one discounted contract at the shared meter with centralized DSO dispatch.
-
-Run the implemented cases with:
-
-```bash
-python main.py --R
-python main.py --I
-python main.py --C
-python main.py --DP
-```
-
-Each `--R`, `--I`, or `--C` run prints its objective and daily energy totals and writes dispatch and contract
-figures to `results/<community>/`:
-
-- `<mode>_dispatch.png` compares community load, PV generation, grid import, and export over the day.
-- `<mode>_contract.png` compares grid import with the DSO capacity limit. For `R`, the figure shows the
-  unconstrained reference import; for `I` and `C`, import above the cap is highlighted.
-- `<mode>_member_benefits.png` is also written for `I` and `C`; it stacks each member's operating-cost benefit
-  versus `R` within the four asset groups: no asset, PV, battery, and PV plus battery.
-
-In model `C`, the DSO centrally dispatches every member's flexible load, PV, and battery. Member net
-consumption is settled internally; only aggregate community import and export are exchanged through the
-shared meter. Community import is subject to the DSO capacity limit and the soft-cap penalty.
-
-Battery models use the explicit `battery_end_soc_value_DKK_per_kWh` parameter, the economic value of
-energy remaining in the battery at the end of the horizon. The command-line override is:
-
-```bash
-python main.py --R --battery-end-value 0.25
-```
-
-The model creates PV and battery variables only for members that own those assets. The linear absolute
-deviation from each member's reference profile remains in the objective; the old quadratic disutility
-formulation is not used.
-
-Every experiment of Question 1 is started from `main.py` and writes to `results/<community>/`.
-The calculations and experiment orchestration are in `src/analysis_q1.py`; Question 1 figures are in
-`src/q1_plotting.py`. The entry point delegates the work to these modules. No random numbers are used, so there are no seeds.
-
-```bash
-python main.py --q1                 # all three experiments below
-python main.py --q1-base            # Comparison of the contract types
-python main.py --q1-sweep           # Sweep of contract terms of I and C over beta^DSO and the cap factor phi (Figure 1)
-python main.py --q1-settlement      # Settlement of C at lambda_t, individual rationality, manager's budget (Figure 2)
-```
-
-The sweep uses `beta^DSO` in {0, 0.25, 0.5, 0.75, 1} and `phi` in {0.7, 0.8, 0.9, 1.0, 1.15, 1.3, 1.6, 2.0}
-(`phi = 1.3` is the base case, the cap is `phi x daily import of R / 24`; `alpha^DSO` stays at 10). Change them with
-`--betas` and `--phis`, e.g. `python main.py --q1-sweep --betas 0 0.5 1 --phis 1.0 1.3`.
-
-| Command           | Output in `results/base/`                                                      |
-|-------------------|--------------------------------------------------------------------------------|
-| `--q1-base`       | `q1_table3_base_case.csv`                                                      |
-| `--q1-sweep`      | `q1_sweep_beta_cap.csv`, `q1_gain_map.png`, `sweep/q1_dso_view.png`             |
-| `--q1-settlement` | `q1_settlement_members.csv`, `q1_settlement_hourly.csv`, `q1_member_gains.png` |
-
-The settlement experiment also prints: the manager's surplus `B`, the check `B = sum_t nu_t P_t^DSO`,
-`sum_i S_i = J^C + B`, the number of members worse off than under R and I, and the gain by asset class and by disutility class.
-The dual prices `lambda_t` and `nu_t` are read from the LP solution of model C, so Gurobi must solve it as an LP.
-
-
-Question 2’s dynamic-pricing model is kept in `src/dynamic_pricing_model.py`; its analysis and
-figures are handled by `src/dynamic_pricing_analysis.py` and `src/dynamic_pricing_plotting.py`.
-The command-line interface remains in `main.py`, so the existing `--DP`, `--bb`, `--ir`, and
-`--cap-f` options continue to run the same experiments.
-
-Question 2 can add budget balance (`--DP --bb`), budget balance plus individual
-rationality (`--DP --ir`), or run a cap-tightness sweep (`--DP --cap-f 1.0 1.3 1.6`).
-The analysis, validation tables, and figures are written under `results/<community>/`.
-Additional solver/model options include `--sos1` (use SOS1 complementarity), `--tight-M` (use per-set
-big-M bounds), `--M-scale` (scale those bounds), `--reg` (price regularization), `--time-limit`,
-`--mip-focus`, `--ir-penalty`, and `--ir-bench`. Run `python main.py --help` for the full option descriptions.
-
-Question 3 is not yet a solver-backed experiment: `--demo` runs the scenario-generation demonstration, and
-`src/scenario_generation.py` provides functions for drawing and merging preference scenarios. The notebook
-example below shows those utilities; it does not run a Question 3 optimization.
-
-
-## 3. How to use the code
-
-**From a notebook or your own script** (run from the repository root):
-```python
-from src.data_loader import load_community
-from src import scenario_generation as sg
-
-com = load_community("base")                       # day d1
-print(com.summary())
-for m in com.members:                              # Assignment 1 InputData objects
-    print(m.consumer_id, m.archetype, m.linear_disutility, m.min_daily_energy_kWh, m.pv_max_kW, m.battery_capacity_kWh)
-
-cap   = com.contract.capacity_limit_kW             # 24 values, kW, at the connection point
-beta  = com.contract.tariff_discount_ratio         # 0.75 in the base case
-alpha = com.contract.penalty_DKK_per_kWh           # 10 in the base case
-cap_i = com.contract.individual_capacity_limit_kW  # {consumer_id: 24 values}  (benchmark model I)
-
-com_d4 = load_community("base", day="d4")          # another day of the week (prices, PV, reference profiles and cap)
-com_nb = load_community("base")                    # a member-mix variation, built in code (Section 4.3): no batteries
-for m in com_nb.members:
-    for k in [k for k in vars(m) if k.startswith("battery_")]:
-        setattr(m, k, None)
-
-# Question 3: five joint scenarios with the members' reference profiles uncertain (the daily minimum follows); cL at its base value
-app, par = com.raw["appliance_params"], com.raw["params"]
-rules3 = sg.load_json("preference_uncertainty_params.json")
-scenarios = sg.draw_preference_scenarios(app, par, rules3, n=5, seed=1)                  # quantities=("profile",) by default
-# ... or tune the hyper-parameters per quantity and per member, draw, and merge yourself:
-spec = sg.rules_to_spec(rules3, [c["consumer_id"] for c in par["consumers"]])
-sg.set_rule(spec, "profile", None, n_scenarios=10, lo=0.9, hi=1.1, mean=1.0, kappa=4.0)  # all members
-sg.set_rule(spec, "cL", "C4", n_scenarios=10, lo=0.6, hi=1.4, mean=1.0, kappa=2.0)       # one member; cL uncertain as a variation
-scaling = sg.draw_scaling_scenarios(spec, seed=1)                 # {quantity: {consumer_id: array of theta}}
-joint = sg.merge_scenarios(app, par, scaling, mode="aligned")     # joint scenarios with .index, .theta, .members
-
-```
-
-**Conventions.** The hourly resolution makes kW and kWh/h numerically interchangeable, as in Assignment 1.
-`InputData` carries the *full* tariffs of `bus_params.json`; the discount of the contract is in
-`ContractData.tariff_discount_ratio` and applies to the metered flows of the community (model C) or of the
-member (model I) as the assignment defines them. The notation of the assignment follows Assignment 1
-(price p_t, tariffs tau_imp / tau_exp, member variables q_imp, q_exp, l, g, battery p_ch, p_dis, s) with a
-member index; the community's import and export at the connection point are P_imp_t and P_exp_t, the cap
-is P_DSO_t (`capacity_limit_kW`).
-
-## 4. Input data
-
-All input data lives in `data/`, in the conventions of Assignment 1: every field name carries its unit
-(`_kW`, `_kWh`, `_KWh_per_hour`, `_DKK_per_kWh`, `_DKK_per_kWh2`), ratios and capacity factors are
-dimensionless fractions of the corresponding maximum, every time series is a list of 24 hourly values (hour 0
-to 23), `null` means "not applicable", and a community file composes its members from the shared catalogue by
-appliance ID. Section 4.1 describes how the members are built; Section 4.2 gives the structure of every file; Section 4.3 says how to build variations of the base case.
-
-### 4.1 The members and the base case
-
-**The members.** Every member is one Assignment 1 consumer with **one load model and an asset mix**:
-
-* *Load* - the structure of the Assignment 1 load (Question 2), with the same parameters for every member except the slope of
-  the disutility: a preferred hourly profile `reference_load[t]` = `max_load_KWh_per_hour` x `reference_load_capacity_factor[t]`
-  (`max_load_KWh_per_hour` = 3 kWh/h is the connection capacity; 16.2 kWh/day on `d1`); a **maximum hourly deviation**
-  `max_hourly_deviation_kWh` = 1 kWh from the reference, so that the hourly bounds are `load_lower_kWh[t]` = max(0, reference - 1)
-  and `load_upper_kWh[t]` = min(3, reference + 1) (the loader computes them); a **linear** disutility c_L (DKK/kWh) on the
-  absolute hourly deviation from the reference; and a minimum daily
-  energy **equal to the daily reference energy**, E_min = sum_t reference_load[t] (16.2 kWh on `d1`; `min_total_energy_rule`
-  in the catalogue, and the loader sets the value from the profile of the day loaded). Four slopes exist in the catalogue
-  and every member has one of them:
-
-  | Load | c_L (DKK/kWh) | Behaviour against the day's price spread (0.85-2.50 DKK/kWh) |
-  |---|---|---|
-  | `FL_L1` | 0.25 | shifts on the day-ahead prices alone |
-  | `FL_L2` | 0.5 | shifts on the larger price differences of the day |
-  | `FL_L3` | 1.0 | shifts only when the cap rent adds to the price difference |
-  | `FL_L4` | 2.0 | keeps its profile and pays |
-
-  The daily minimum fixes how much a member uses over the day; the slope fixes when; the deviation limit fixes how much can
-  move in one hour, so that the stiffer classes are called only in the most congested hours. With a linear disutility a member keeps
-  its reference in an hour as long as the price differs from its internal value of a kWh of daily need (the multiplier of
-  the daily minimum) by less than c_L, and otherwise moves the hour's load to a bound; at a price exactly c_L away it is
-  indifferent (its problem is a linear program). `InputData.slope_class` returns 1-4 (1 = most flexible).
-* *Assets* - with or without a PV system (`PV_01_S`: 3 kW, the day's availability profile, marginal cost 1.41 DKK/kWh;
-  `has_pv`) and with or without a battery (`BAT_01_S`: 2 kWh, 0.75 kW charge/discharge, efficiencies 0.95, initial state of
-  charge 50 %, end-of-day treatment your choice; `has_battery`). `InputData.archetype` combines slope class and assets:
-  `"L1+PV+BAT"`, `"L3+PV"`, `"L4"` (no assets), ...
-
-**Base case** (`params_community_base.json`, day `d1`): 16 small members, one per combination of a slope and an asset class;
-the ID carries the slope index and the assets (`C3_PV` = `FL_L3` with a PV system and no battery):
-
-| Load (slope) | no asset | PV | battery | PV and battery |
-|---|---|---|---|---|
-| `FL_L1` (0.25) | `C1` | `C1_PV` | `C1_B` | `C1_PVB` |
-| `FL_L2` (0.5) | `C2` | `C2_PV` | `C2_B` | `C2_PVB` |
-| `FL_L3` (1.0) | `C3` | `C3_PV` | `C3_B` | `C3_PVB` |
-| `FL_L4` (2.0) | `C4` | `C4_PV` | `C4_B` | `C4_PVB` |
-
-48 kW of connected load, 24 kW of PV (8 systems), 8 batteries. The eight members without PV import their whole daily energy
-(16.2 kWh on `d1`) and are what makes the exchange inside the community non-trivial; the low-slope members and the batteries
-are where the community's flexibility comes from. `load_community("base")` returns the members in the order of the table, row by row.
-
-Only this community is shipped. Variations of the member mix are built in code, or as your own community file (Section 4.3).
-
-### 4.2 File structures
-
-#### `appliance_params.json` - the shared catalogue (Assignment 1 format)
-
-| Key | Type | Content |
+| Question | Command | Purpose |
 |---|---|---|
-| `description` | str | what the catalogue holds |
-| `DERs[]` | list | `DER_id` (`PV_01_S`), `DER_type` (`"PV"`), `max_power_kW` (3.0), `marginal_cost_DKK_per_kWh` (1.41), `hourly_profile_ratio[24]` (day `d1`), `hourly_profile_ratio_next_day[24]` (day `d2`) |
-| `loads[]` | list | `load_id` (`FL_L1`-`FL_L4`), `load_type`, `consumption_utility_DKK_per_kWh` (`null`), `linear_disutility_DKK_per_kWh` (0.25 / 0.5 / 1.0 / 2.0), `quadratic_disutility_DKK_per_kWh2` (`null`), `min_total_energy_per_day_kWh` (16.17 = the daily reference energy of `d1`), `min_total_energy_rule` (the daily minimum equals the daily reference energy; the loader sets it per day), `max_load_KWh_per_hour` (3.0), `min_load_KWh_per_hour` (0.0), `max_hourly_deviation_kWh` (1.0), `hourly_bounds_rule` (text), `reference_load_capacity_factor[24]` (day `d1`), `reference_hourly_profile_ratio_next_day[24]` (day `d2`) |
-| `storages[]` | list | `storage_id` (`BAT_01_S`), `storage_type`, `storage_capacity_kWh` (2.0), `max_charging_power_kW` / `max_discharging_power_kW` (0.75), `charging_efficiency` / `discharging_efficiency` (0.95), `initial_state_of_charge_ratio` (0.5) |
+| 1 | `python main.py --q1` | Run the comparison, contract sweep, and settlement analyses |
+| 2 | `python main.py --q2-dp --q2-ir` | Run Question 2 dynamic pricing with budget balance and individual-rationality requirements |
+| 3 | `python main.py --q3` | Run the scenario study, stochastic experiments, out-of-sample evaluation, and figures |
+| Tests | `python main.py --unit-tests` | Run fast data-loader and CLI tests without solving models |
+| Question 3 validation | `python main.py --q3-validation` | Run the unit tests and Question 3 scenario/model checks |
 
-The profiles in the catalogue are those of day `d1`; the loader replaces them by the profiles of the day you ask for.
+Question 1 experiments can be run separately with `--q1-base`, `--q1-sweep`, or `--q1-settlement`. Question 2 options
+use the `--q2-` prefix, for example `--q2-bb`, `--q2-ir`, `--q2-cap-f`, `--q2-sos1`, and `--q2-time-limit`.
+For individual Question 1 dispatch cases, use `--q1-r`, `--q1-i`, or `--q1-c`. The former unprefixed options
+(such as `--DP`, `--ir`, `--time-limit`, `--R`, and `--C`) remain accepted as aliases.
 
-#### `bus_params.json` - the connection point (unchanged from Assignment 1)
+Question 3's full run solves several models and can take hours. Run its stages separately with `--q3-step1`,
+`--q3-runs`, `--q3-evaluate`, or `--q3-figures`; use `--q3-list` to see run status. `--q3-time-scale` multiplies
+per-run solver time limits; it is not a total runtime limit. Use it with `--q3` or `--q3-runs`, and use
+`--q3-only RUN_NAME ...` to select runs. The full Question 3 validation takes approximately 15–20 minutes with the
+default solver limits; use `--q3-validation --q3-validation-only V1 V2` or
+`--q3-validation --q3-validation-time-limit 60` to shorten it. The old `--test`, `--test-only`, and
+`--test-time-limit` validation options remain accepted as aliases.
 
-A list with one bus: `bus_id` (`"Bus1"`), `import_tariff_DKK_per_kWh` (0.5), `export_tariff_DKK_per_kWh` (0.4),
-`max_import_kW` / `max_export_kW` (`null`: the cap of the contract, not a physical limit, bounds the import),
-`energy_price_DKK_per_kWh[24]` (day `d1`), `energy_price_next_day_DKK_per_kWh[24]` (day `d2`).
+Results and figures are written under `results/q1`, `results/q2`, and
+`results/q3`, according to the question that produced them. The default community is `base`; select
+another community file with `--community NAME`, or load a different day with `--day d1` through `--day d7` for the
+deterministic models. The stochastic Question 3 study uses day `d1`.
 
-#### `weekly_profiles.json` - one week of daily profiles
+## Project layout
 
-| Key | Type | Content |
-|---|---|---|
-| `description`, `base_day` | str | `base_day` is `"d1"` |
-| `days.<d>` for `d1` ... `d7` | dict | `name` (the day's story), `energy_price_DKK_per_kWh[24]`, `pv_hourly_profile_ratio[24]` (common to every PV system), `reference_load_capacity_factor[24]` (common to the four loads; the reference load is this factor x `max_load_KWh_per_hour`) |
+```text
+main.py                 Short executable entry point
+src/cli.py              Command-line parsing and dispatch
+src/data_loader.py      Community and input-data loading
+src/model.py            Shared community optimization models
+src/q1_*.py             Question 1 analysis and figures (shared dispatch plots included)
+src/q2_*.py             Question 2 dynamic-pricing model, analysis, and figures
+src/q3_*.py             Question 3 scenarios, stochastic analysis, validation, and figures
+data/                   Input parameters, profiles, and assignment figures
+hpc/                    DTU HPC setup and job-submission scripts
+tests/                  Fast unit and CLI smoke tests
+```
 
-`d1` and `d2` are the two days of Assignment 1; `d3`-`d7` are constructed from them. `load_community(..., day="d3")`
-writes a day's profiles into the Assignment 1 fields; `scenario_generation.day_data` does the same on the raw
-dictionaries, for your own loader. The "next day" of `d7` is `d1`.
+The shipped data describes one 16-member base community. Input files are in `data/`; experiments write generated
+tables, model outputs, and plots to `results/`.
 
-#### `params_community_<name>.json` - a community (Assignment 1 case-file format)
+## DTU HPC
+The High performance compute provided by DTU is convenient to use for the large models in question 2 and 3.
+Question 2 and 3 have submission scripts in `hpc/`. 
+For cluster setup, result transfer, and job submission, see the short [HPC guide](hpc/README.md). 
 
-| Key | Type | Content |
-|---|---|---|
-| `community_id`, `description` | str | |
-| `consumers[]` | list of 16 | `consumer_id` (`C<k>`, `C<k>_PV`, `C<k>_B`, `C<k>_PVB`, k = 1..4), `connection_bus` (`"Bus1"` for every member: they share the meter), `list_appliances` (IDs from the catalogue: optionally `PV_01_S`, exactly one load `FL_L<k>`, optionally `BAT_01_S`) |
-| `hyperparameters` | `null` | |
+## Docstring of functions added
 
-One file is shipped (`base`, Section 4.1). You may add your own `params_community_<name>.json` in the same format and load it with `load_community("<name>")`.
+In the descriptions below, hourly energy
+flows and demand are in kWh per one-hour interval (numerically equal to the
+average kW over that hour); power and capacity limits are in kW; energy prices
+and tariffs are in DKK/kWh; costs, revenues, and settlements are in DKK; and
+battery terminal values are in DKK/kWh. Indices, probabilities, ratios, flags,
+and solver settings are dimensionless. 
 
-#### `dso_contract_params.json` - the capacity limitation contract
+### `src/cli.py`
 
-| Key | Type | Content |
-|---|---|---|
-| `contract_id`, `description`, `connection_point_bus` | str | |
-| `tariff_discount_ratio` | float | beta = 0.75: the contract holder pays (1 - beta) x the tariffs of `bus_params.json` on its metered import and export |
-| `penalty_DKK_per_kWh` | float | alpha = 10: per kWh imported above the cap in an hour |
-| `capacity_limit_kW[24]` | list | the base cap: day `d1`, constant over the hours (9.4 kW) |
-| `capacity_limit_rule` | str | cap = f x E / 24 in every hour (a feeder capacity), E = daily import of the reference model R on the day, f the energy factor; scale the constant to vary the tightness |
-| `capacity_limit_daily_energy_factor` | float | f = 1.3 |
-| `capacity_limit_daily_energy_kWh` | float | f x E on `d1` |
-| `export_capacity_limit_kW` | `null` | no export cap |
-| `capacity_limits_by_day_kW.<d>` | list | the cap of every day `d1`-`d7` (24 equal values) |
-| `reference_model_R_by_day.<d>` | dict | `daily_import_kWh`, `peak_import_kW`, `cost_DKK`, `exceedance_kWh` of the reference model R (members alone, no contract) - to check your model R |
-| `individual_contracts.rule` | str | model I: cap_{i,t} = share_i x cap_t, share_i proportional to the member's net import in R on the day |
-| `individual_contracts.net_import_in_R_kWh_d1` | dict | consumer_id -> kWh |
-| `individual_contracts.share`, `.share_by_day.<d>` | dict | consumer_id -> share (day `d1`; every day) |
-| `individual_contracts.individual_capacity_limit_kW_d1` | dict | consumer_id -> 24 values |
-| `individual_contracts.alternative_split_rules` | dict | `capacity` (rule text, `max_import_capacity_kW` and `share` per member), `peak`, `energy_gross`, `hourly` (rule texts) |
+- `run_unit_tests()` — Runs the fast unit-test suite; returns no value.
+- `main()` — Parses command-line options and dispatches the requested experiment; returns no value.
 
-The shares of the file are those of the base community; for a member-mix variant R changes, so the loader falls back on
-the capacity rule (`ContractData.share_rule == "capacity"`) - recompute the net-import shares with your own model R if
-you keep the base rule.
+### `src/model.py`
 
-#### `preference_uncertainty_params.json` - Question 3
+- `Results.save(folder, tag)` — Inputs: output folder and filename tag. Writes hourly results and a summary; no return value.
+- `Results.__str__()` — Input: solved results. Returns a text summary with objective (DKK) and daily energy totals (kWh).
+- `_status_name(code)` — Input: Gurobi status code. Returns its status name as text.
+- `SingleConsumerModel.__init__(data, name, verbose, battery_end_soc_value_DKK_per_kWh)` — Inputs: consumer data and solver settings. Initializes a single-consumer model; no return value.
+- `SingleConsumerModel.build()` — Builds the single-consumer model; returns the model instance.
+- `SingleConsumerModel._add_variables()` — Adds hourly import, export, load, PV, deviation, and optional battery variables; no return value.
+- `SingleConsumerModel._objective()` — Builds the consumer cost objective (DKK); returns a Gurobi expression.
+- `SingleConsumerModel._objective_sense()` — Returns the minimization direction; no physical units.
+- `SingleConsumerModel._power_balance(t)` — Input: hour index. Returns the hourly energy-balance expression (kWh).
+- `SingleConsumerModel._add_constraints()` — Adds load, PV, deviation, daily-energy, and optional battery constraints; no return value.
+- `SingleConsumerModel._add_battery_constraints()` — Adds battery charge/discharge and state-of-charge constraints; no return value.
+- `SingleConsumerModel.solve()` — Solves the model; returns `Results` with hourly values and objective (DKK).
+- `SingleConsumerModel._extract_results(status)` — Inputs: solver status. Returns `Results` with hourly flows (kWh), prices (DKK/kWh), and objective (DKK).
+- `CommunityModel.__new__(data, contract_mode, name, verbose, battery_end_soc_value_DKK_per_kWh)` — Inputs: community data and contract/solver settings. Returns the matching community model instance.
+- `_CommunityModelBase.__init__(data, name, verbose, battery_end_soc_value_DKK_per_kWh)` — Inputs: community data and solver settings. Initializes shared model state; no return value.
+- `_CommunityModelBase.build()` — Builds the community model and constraints; returns the model instance.
+- `_CommunityModelBase._add_variables()` — Adds member load, deviation, PV, battery, import, and export variables; no return value.
+- `_CommunityModelBase._add_contract_variables()` — Adds member import/export variables; no return value.
+- `_CommunityModelBase._objective()` — Abstract objective hook; returns a Gurobi cost expression (DKK).
+- `_CommunityModelBase._member_var(name, i, t)` — Inputs: variable name, member index, and hour index. Returns the requested model variable or zero.
+- `_CommunityModelBase._add_physical_constraints()` — Adds member power-balance constraints (kWh) and member constraints; no return value.
+- `_CommunityModelBase._add_member_constraints()` — Adds load, deviation, PV, and optional daily-energy/battery constraints; no return value.
+- `_CommunityModelBase._add_contract_constraints()` — Contract-constraint hook; no return value.
+- `_CommunityModelBase._add_member_battery_constraints(i, d)` — Inputs: member index and data. Adds battery limits (kW/kWh) and state-of-charge constraints; no return value.
+- `_CommunityModelBase._battery_terminal_value()` — Returns the terminal battery-value contribution to the objective (DKK).
+- `_CommunityModelBase._objective_sense()` — Returns the minimization direction; no physical units.
+- `_CommunityModelBase._extract_results(status)` — Input: solver status. Returns community `Results`, with hourly flows (kWh), member costs (DKK), and objective (DKK).
+- `_CommunityModelBase._member_operating_costs()` — Returns each member's operating cost (DKK), keyed by consumer ID.
+- `_CommunityModelBase.solve()` — Solves the community model; returns `Results`.
+- `NoContractCommunityModel._objective()` — Builds the no-contract community cost objective (DKK); returns a Gurobi expression.
+- `IndividualContractCommunityModel._add_contract_variables()` — Adds variables for individual contracts; no return value.
+- `IndividualContractCommunityModel._add_contract_constraints()` — Adds individual import-cap and penalty constraints; no return value.
+- `IndividualContractCommunityModel._objective()` — Builds the individual-contract cost objective (DKK); returns a Gurobi expression.
+- `CommunityContractCommunityModel._add_physical_constraints()` — Adds the community balance constraint; no return value.
+- `CommunityContractCommunityModel._add_contract_variables()` — Adds community import/export, net-consumption, and excess variables; no return value.
+- `CommunityContractCommunityModel._add_contract_constraints()` — Adds community capacity and excess constraints; no return value.
+- `CommunityContractCommunityModel._extract_results(status)` — Input: solver status. Returns community-contract `Results` with hourly flows and costs.
+- `CommunityContractCommunityModel._objective()` — Builds the community-contract cost objective (DKK); returns a Gurobi expression.
+- `__getattr__(name)` — Input: missing attribute name. Forwards supported compatibility lookups; returns the resolved attribute.
 
-The reference profile of every load is uncertain (the base study), and its disutility slope can be made uncertain as a variation. Each
-uncertain quantity is driven by **one scaling parameter theta** per member, drawn from a scaled Beta distribution:
+### `src/q1_analysis.py`
 
-    theta ~ lo + (hi - lo) x Beta(a, b),    a = kappa (mean - lo) / (hi - lo),    b = kappa - a
+- `with_contract(com, beta, cap_scale)` — Inputs: community, tariff discount ratio, and cap multiplier. Returns a copy with modified contract terms; ratios are dimensionless and caps are kW.
+- `solve(com, mode, end_value)` — Inputs: community, contract mode, and battery terminal value (DKK/kWh). Returns the built model and its `Results`.
+- `_arr(var, T)` — Inputs: model variables and hour indices. Returns their solved values as a numeric array.
+- `asset_label(m)` — Input: member data. Returns its PV/battery asset label.
+- `dso_metrics(imp, imp_ref, cap)` — Inputs: import and cap profiles (kW). Returns peak/total import (kW/kWh), reduction (%), and cap-exceedance metrics (kW/kWh/hours).
+- `dso_revenue(mdl, com, mode)` — Inputs: solved model, community, and contract mode. Returns DSO grid revenue (DKK).
+- `base_comparison(com, end_value)` — Inputs: community and battery terminal value (DKK/kWh). Returns the base comparison for contract cases R, I, and C.
+- `contract_sweep(com, end_value, betas, phis)` — Inputs: community, terminal value (DKK/kWh), discount ratios, and cap factors. Returns a `DataFrame` of contract gains and DSO metrics.
+- `own_costs(mdl, end_value)` — Inputs: solved model and terminal value (DKK/kWh). Returns member operating costs excluding grid payments (DKK).
+- `grid_payment_RI(mdl, com, mode)` — Inputs: solved model, community, and R/I mode. Returns each member's grid payment (DKK).
+- `community_settlement(mdl, com, end_value)` — Inputs: solved C model, community, and terminal value (DKK/kWh). Returns member settlement and manager-surplus results (DKK).
+- `settlement_study(com, end_value)` — Inputs: community and terminal value (DKK/kWh). Returns the R/I/C individual-rationality and budget study.
+- `Question1Experiment.__init__(results_dir)` — Input: results directory. Initializes Question 1 output paths; no return value.
+- `Question1Experiment.run(community, args)` — Inputs: community and CLI options. Runs selected Question 1 experiments; no return value.
+- `Question1Experiment._run_base(community, end_value, output_dir)` — Inputs: community, terminal value (DKK/kWh), and output directory. Runs the base comparison; no return value.
+- `Question1Experiment._run_sweep(community, end_value, output_dir, plotter, betas, phis)` — Inputs: community, sweep parameters, output path, and plotter. Runs the contract sweep; no return value.
+- `Question1Experiment._run_settlement(community, end_value, output_dir, plotter)` — Inputs: community, terminal value, output path, and plotter. Runs the settlement study; no return value.
 
-- `lo`, `hi`: hard bounds, never violated (no clipping);
-- `mean`: where the scenarios are centred (1 = the base case; another value shifts them);
-- `kappa`: concentration, i.e. how uncertain: Var theta = (hi - lo)^2 mu (1 - mu) / (kappa + 1) with mu = (mean - lo)/(hi - lo);
-  kappa -> infinity is deterministic, kappa = 2 with the mean at the midpoint is Uniform(lo, hi), kappa < 2 is U-shaped.
-  The code computes a and b (`BetaRule.ab`); check them when you tune - a or b below 1 piles density at a bound;
-- `n_scenarios`: 1 means the quantity is not uncertain in the experiment (its single scenario is the base value, theta = 1).
+### `src/q1_plotting.py`
 
-| Key | Quantity | Rule | Defaults (base = Uniform) |
-|---|---|---|---|
-| `quantities.profile` | `reference_load_capacity_factor` rho_t | rho_t ^ theta, one theta per member for all hours (keeps 0 and 1 fixed, stays in [0, 1]); the daily minimum follows: `min_total_energy_per_day_kWh` = max_load x sum_t rho_t^theta in every scenario | 5 scenarios, [0.8, 1.2], mean 1, kappa 2 |
-| `quantities.cL` | `linear_disutility_DKK_per_kWh` | value x theta (a variation: not uncertain in the base study) | 1 scenario; when uncertain [0.6, 1.4], mean 1, kappa 2 |
-| `daily_minimum_rule` | the rule above, in words | | |
-| `per_consumer` | overrides `{quantity: {consumer_id: {...}}}` of any hyper-parameter | | empty |
-| `merging` | how independent draws become joint scenarios: joint scenario s takes scenario s of every uncertain (quantity, member) pair (`aligned`; the code also offers `random` and `product`) | | `aligned` |
-| `scenarios` | in-sample sizes to study, out-of-sample size, seed policy | | 5 and 10, 100 |
+- `plot_results(result, contract, energy_price, output_dir, tag)` — Inputs: model results, contract, and hourly energy prices (DKK/kWh). Saves dispatch/capacity figures and returns their paths.
+- `plot_member_benefits(reference, contract_result, members, output_dir)` — Inputs: reference and contract results and member data. Saves a benefit figure (DKK) and returns its path.
+- `_zero_crossing(x, y)` — Inputs: numeric curve coordinates. Returns the first interpolated zero crossing, or `None`.
+- `plot_gain_map(grid, output_dir, base)` — Inputs: sweep data and base contract ratios. Saves a community-gain figure and returns its path.
+- `plot_dso_view(grid, output_dir, beta, base_phi)` — Inputs: sweep data and contract ratios. Saves DSO revenue/exceedance figures and returns its path.
+- `plot_member_gains(members, output_dir)` — Inputs: member benefit data (DKK) and output directory. Saves a figure and returns its path.
+- `Question1Plotter.__init__(output_dir)` — Input: output directory. Initializes the plotting helper; no return value.
+- `Question1Plotter.gain_map(grid)` — Input: gain-sweep data. Saves the gain map and returns its path.
+- `Question1Plotter.dso_view(grid)` — Input: DSO sweep data. Saves the DSO view and returns its path.
+- `Question1Plotter.member_gains(members)` — Input: member benefit data. Saves the member-gain figure and returns its path.
 
-Code (`src/scenario_generation.py`): `rules_to_spec(rules, consumer_ids)` -> `{quantity: {consumer_id: BetaRule}}`;
-`set_rule(spec, quantity, consumer_id or None, **hyper-parameters)`; `draw_scaling_scenarios(spec, seed)` -> independent
-scenarios of theta per quantity and per member (each pair has its own random stream, so changing one pair's `n_scenarios`
-does not change the others' draws); `merge_scenarios(app, community, scaling, mode="aligned")` -> joint scenarios,
-each with `index[(quantity, consumer_id)]` (which independent scenario it took), `theta[quantity][consumer_id]` and
-`members[consumer_id] -> {appliance_id: scaled appliance dict}`; `draw_preference_scenarios(app, community, rules, n, seed,
-quantities)` does the three steps in one call with the file's hyper-parameters; `expected_preference_scenario` is the
-baseline (theta = 1 everywhere).
+### `src/q2_analysis.py`
 
-#### Figures
+- `solve_dp(com, args, lam_C, label, budget_balance, ir_benchmark)` — Inputs: community, CLI/model settings, C prices (DKK/kWh), label, and optional requirements. Builds/solves a DP variant; returns `None` if no solution is available.
+- `asset_type(m)` — Input: member data. Returns the PV/battery asset label.
+- `member_order(members)` — Input: member records. Returns indices ordered by asset type and load slope.
+- `ir_benchmark_costs(R, I, rule)` — Inputs: R/I results and benchmark rule. Returns member benchmark costs (DKK).
+- `q2_metrics(r, com, prices)` — Inputs: run results, community, and prices (DKK/kWh). Returns community metrics (DKK/day, kWh/day, and kW).
+- `member_table(r, R, I, bench, members)` — Inputs: run, R/I references, benchmark costs (DKK), and members. Returns per-member cost and benefit table (DKK).
+- `validation_row(r, lam_C)` — Inputs: DP results and C prices (DKK/kWh). Returns model/contract validation metrics.
+- `write_latex(df, path, caption, label, digits)` — Inputs: table and LaTeX metadata. Writes a LaTeX table; returns no value.
+- `write_latex.fmt(v)` — Input: a table cell. Returns its formatted LaTeX representation.
+- `scaled_cap(com, f)` — Inputs: community and dimensionless cap factor. Returns a copy with scaled community/member capacities (kW).
+- `dual_settlement_costs(C, lam_C)` — Inputs: C results and internal prices (DKK/kWh). Returns member settlement costs (DKK).
+- `run_dp_case(com, args, out, plots)` — Inputs: community, run settings, output path, and plot flag. Returns results for C/R/I and DP steps.
+- `run_dp(com, args, results_dir)` — Inputs: community, run settings, and results directory. Runs Question 2 experiments; no return value.
+- `DynamicPricingExperiment.__init__(results_dir)` — Input: results directory. Initializes Question 2 output paths; no return value.
+- `DynamicPricingExperiment.run(community, args)` — Inputs: community and CLI options. Runs selected Question 2 experiments; no return value.
 
-`community_base_case.png/.svg`, `setup_R.png/.svg`, `setup_I.png/.svg`: Figures 1-3 of the assignment (schematic); `fig_q3_scenarios` (.png/.svg): Figure 4, the scenario generation of Question 3.
+### `src/q2_model.py`
 
-### 4.3 Variations of the base case
+- `_battery_parameters(member)` — Input: member data. Returns efficiencies (dimensionless), charge/discharge limits (kW), capacity (kWh), and initial state of charge (kWh).
+- `DynamicPricingCommunityModel.__init__(data, name, verbose, battery_end_soc_value_DKK_per_kWh, method, M_P, M_D, reg_weight, reg_reference, mip_gap, time_limit, budget_balance, ir_benchmark, ir_penalty, tight_M, M_scale, mip_focus, threads)` — Inputs: community/model settings, solver limits, and optional budget/IR requirements. Initializes a DP model; no return value.
+- `DynamicPricingCommunityModel.build()` — Builds model C, posted prices, KKT conditions, and optional requirements; returns the model.
+- `DynamicPricingCommunityModel._add_price()` — Adds hourly posted-price variables (DKK/kWh); no return value.
+- `DynamicPricingCommunityModel._compl(expr, mu, name, M_P, M_D)` — Inputs: complementarity slack and multiplier bounds. Adds SOS1 or big-M complementarity constraints; no return value.
+- `DynamicPricingCommunityModel._add_kkt()` — Adds member KKT stationarity and complementarity constraints; no return value.
+- `DynamicPricingCommunityModel.dual_objective(i)` — Input: member index. Returns the member's dual-cost expression (DKK).
+- `DynamicPricingCommunityModel._add_budget_balance()` — Adds the budget-balance constraint; no return value.
+- `DynamicPricingCommunityModel._add_regularization()` — Adds price regularization toward a reference price (DKK/kWh); no return value.
+- `DynamicPricingCommunityModel._member_operating_costs()` — Returns each member's DP operating cost (DKK).
+- `DynamicPricingCommunityModel._extract_results(status)` — Input: solver status. Returns DP `Results` with posted prices (DKK/kWh), validation, and cost/surplus summaries (DKK).
+- `DynamicPricingCommunityModel.solve()` — Solves the DP model; returns `Results`.
+- `DynamicPricingCommunityModel.validate()` — Returns complementarity, big-M, price-bound, and indifferent-pair checks; residuals use model units.
+- `DynamicPricingCommunityModel._add_individual_rationality()` — Adds soft individual-rationality constraints and compensation slack (DKK); no return value.
+- `internal_price_of_C(c_model)` — Input: solved community-contract model. Returns hourly internal prices (DKK/kWh).
 
-Every sensitivity analysis is a variation of the base case, built *in code* from the loaded objects. The data files are
-never edited, so that base-case results are on the data as provided and comparable across groups. Table 11 of the
-assignment gives the same list with the rules that keep a variation consistent.
+### `src/q2_plotting.py`
 
-| Dimension | What to change | Rules |
-|---|---|---|
-| a) Member mix | After `load_community("base")`, edit `com.members`: drop or duplicate `InputData` objects (new `consumer_id` for a copy); change the load slope `linear_disutility` (0.25 to 2.0); remove a PV system (`pv_max_kW = 0`, `pv_available` zero) or a battery (`battery_*` = `None`), or add them with the catalogue values. Or write your own `params_community_<name>.json` (Section 4.2) and load it by name. | One connection point. Recompute the reference import `E^R`, the cap (`f x E^R`, same profile shape) and the shares `kappa_i` from your own model R for the new mix: the loader's shares for a non-base community (`share_rule = "capacity"`) are a placeholder. Name the mix and state what changed. Not required by any question. |
-| b) Daily conditions | `load_community("base", day="d3")`, `d1`-`d7`: prices, PV availability, reference profiles and daily minimum, and the cap of that day, all together. | Never combine the prices of one day with the PV or the cap of another. `d1` and `d2` are the Assignment 1 days. |
-| c) Contract | `com.contract.tariff_discount_ratio` (beta), `.penalty_DKK_per_kWh` (alpha), `.export_capacity_limit_kW`. Cap tightness: multiply `.capacity_limit_kW` by `f'/1.3`; a time-varying cap profile is a variation of your own. Split rule of the individual contracts: recompute `.share` from your model R with another rule of `dso_contract_params.json / individual_contracts / alternative_split_rules` (peak, gross energy, hourly, capacity) and `.individual_capacity_limit_kW = kappa_i x cap`. | Shares sum to one. Compare I and C under the same contract. Name the benchmark by its split rule. |
-| d) Members' parameters | On each `InputData`: `linear_disutility` (one factor for all members keeps the ordering of the slopes); `max_hourly_deviation_kWh` (recompute `load_lower_kWh` / `load_upper_kWh`); `min_daily_energy_kWh` as a ratio of `reference_load.sum()`; `pv_max_kW` (rescale `pv_available`); `battery_capacity_kWh` (scale `battery_max_charge_kW` / `battery_max_discharge_kW` with it). | Keep `reference_load <= load_max_kWh`. A daily minimum above the reference energy forces consumption beyond the preferred profile: say so if intended. Change the same parameter for all members unless heterogeneity is the point. |
-| e) Model variations | Switches of your model class (battery end-of-day; cap as hard constraint or penalty; Question 2 objective, requirements, hard or soft, price bound and regularization; Question 3 cap treatment, requirements per scenario or in expectation, risk measure). | One switch at a time, on the same data. Name the variant with a superscript. |
-| f) Uncertainty, Question 3 | `sg.set_rule(spec, quantity, consumer_id, n_scenarios=..., lo=..., hi=..., mean=..., kappa=...)` for `"profile"` (the base study) or `"cL"` (the disutility slope uncertain instead, or as well); in-sample `N`, out-of-sample size, seeds. | Same out-of-sample set and common random numbers across the models compared. Seeds reported. |
+- `_cap_binding_hours(hourly, cap, tol)` — Inputs: hourly imports (kWh), cap (kW), and tolerance. Returns a Boolean mask of cap-binding hours.
+- `_meter_prices(community)` — Input: community data. Returns hourly marginal import/export prices at the meter (DKK/kWh).
+- `plot_dp_prices(result, lambda_C, community, output_dir, tag)` — Inputs: DP results, C prices, and community. Saves price/flow figures and returns the path.
+- `plot_dp_compare_prices(runs, lambda_C, community, output_dir, tag)` — Inputs: multiple run results, C prices, and community. Saves comparison figures and returns the path.
+- `_tex(name)` — Input: model label. Returns its LaTeX-formatted text.
+- `_min_span(ax, span)` — Inputs: plot axis and minimum span. Adjusts plot range; returns no value.
+- `plot_dp_cost_of_requirements(table, output_dir, tag)` — Inputs: requirement-cost data (DKK) and output options. Saves a figure and returns the path.
+- `plot_dp_benefits_by_member(tables, benchmark, output_dir, tag)` — Inputs: member tables (DKK), benchmark, and output options. Saves a figure and returns the path.
+- `plot_dp_cap_sweep(sweep, output_dir, tag)` — Inputs: cap-sweep results and output options. Saves a sensitivity figure and returns the path.
+- `plot_dp_shift_heatmap(shifts, assets, cap, imports, output_dir, base, compare, tag)` — Inputs: member/hour load shifts (kWh), assets, cap (kW), and comparison runs. Saves a heatmap and returns the path.
+- `DynamicPricingPlotter.__init__(output_dir)` — Input: output directory. Initializes the plotting helper; no return value.
+- `DynamicPricingPlotter.prices(result, lambda_C, community, tag)` — Inputs: run result, reference prices, and community. Saves price plots and returns the path.
+- `DynamicPricingPlotter.compare_prices(runs, lambda_C, community, tag)` — Inputs: run results, reference prices, and community. Saves comparison plots and returns the path.
+- `DynamicPricingPlotter.cost_of_requirements(table, tag)` — Input: requirement-cost table (DKK). Saves its figure and returns the path.
+- `DynamicPricingPlotter.benefits_by_member(tables, benchmark, tag)` — Inputs: member tables (DKK) and benchmark. Saves its figure and returns the path.
+- `DynamicPricingPlotter.cap_sweep(sweep, tag)` — Input: cap-sweep results. Saves its figure and returns the path.
+- `DynamicPricingPlotter.shift_heatmap(shifts, assets, cap, imports, base, compare, tag)` — Inputs: load shifts (kWh), assets, cap (kW), and comparison runs. Saves its figure and returns the path.
 
-Write each variation as a small function that returns a modified copy (`with_discount(com, 0.25)`, `without_batteries(com)`),
-so that every variant is reproducible from a name and a value, and run your model class over the variants as named
-configurations with outputs saved under `results/`. If you add appliances, communities or scenarios, follow the same
-file structures and document them here (file, fields, units, seeds).
+### `src/q3_analysis.py`
 
-## 5. What is expected of your code
+- `deterministic_dp(com, time_limit)` — Inputs: community and optional solver limit (s). Solves DP on expected parameters; returns the solved model.
+- `c_prices(com)` — Input: community. Returns C's hourly internal prices (DKK/kWh).
+- `step1(com, out, n_out, seed_out)` — Inputs: community, output path, scenario count, and random seed. Runs the out-of-sample setup and returns a metrics `DataFrame`.
+- `in_sample(com, n, seed)` — Inputs: community, scenario count, and seed. Returns generated in-sample scenarios.
+- `run_done(folder)` — Input: run directory. Returns whether the run has completed.
+- `load_prices(folder)` — Input: run directory. Returns saved hourly prices (DKK/kWh).
+- `solve_run(com, name, cfg, runs_dir, lam, scale, threads)` — Inputs: community, run configuration, reference prices (DKK/kWh), solver scale, and thread count. Solves/saves one run; no return value.
+- `run_all(com, out, only, force, scale, threads)` — Inputs: community, output directory, run selection, and solver options. Executes selected runs; no return value.
+- `evaluate_all(com, out, n_out, seed_out)` — Inputs: community, output directory, scenario count, and seed. Evaluates runs out of sample and returns a metrics `DataFrame`.
+- `write_comparison_tex(table, path)` — Inputs: comparison table and output path. Writes a LaTeX table; no return value.
+- `main()` — Parses Question 3 analysis options and dispatches stages; returns no value.
 
-As in Assignment 1: keep data loading, model building, solving and plotting separate; document every function you add
-(a short docstring with inputs, outputs and units); make each experiment of the report runnable with a single command
-and save its outputs under `results/`; fix and report the seeds of every scenario set; and commit regularly with
-meaningful messages - the git history is also a record of everyone's contribution. The graders should be able to open
-the code, follow this README, and reproduce every number and figure of the report.
+### `src/q3_plotting.py`
+
+- `load_run(folder)` — Input: run directory. Returns evaluated run data, or `None` if unavailable.
+- `load_runs(runs_dir)` — Input: runs directory. Returns available run data keyed by run name.
+- `_mean(df, col)` — Inputs: results table and column name. Returns the column mean in the same units as that column.
+- `fig_models(runs, out, tag)` — Inputs: run data, output directory, and tag. Saves the model-comparison figure and returns its path (or `None`).
+- `fig_epsilon(runs, out, tag)` — Inputs: run data, output directory, and tag. Saves the epsilon comparison figure and returns its path (or `None`).
+- `fig_scenarios_N(runs, out, tag)` — Inputs: run data, output directory, and tag. Saves the scenario-count figure and returns its path (or `None`).
+- `plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_cost, dp_cost, output_dir, tag)` — Inputs: scenario/member data, cap (kW), and costs (DKK). Saves the validation plot and returns its path.
+- `plot_q3_validation.net_demand(members)` — Input: member flow data (kWh). Returns net demand by hour.
+- `plot_q3_uncertainty_impact(ev, predicted_cost, predicted_surplus, output_dir, label, tag)` — Inputs: evaluation results and predicted cost/surplus (DKK). Saves the uncertainty-impact plot and returns its path.
+- `main(argv)` — Inputs: optional command-line arguments. Runs Question 3 plotting; returns no value.
+
+### `src/q3_scenario_data.py`
+
+- `Scenario.member(consumer_id)` — Input: consumer ID. Returns that member's scenario data.
+- `apply_theta(member, theta_profile, theta_cL)` — Inputs: member data and dimensionless uncertainty multipliers. Returns scaled member data.
+- `scenario_members(com, theta)` — Inputs: community and per-member uncertainty multipliers. Returns scenario member data.
+- `scenario_community(com, scenario)` — Inputs: community and scenario. Returns a community copy with scenario members.
+- `make_spec(com, rules)` — Inputs: community and optional uncertainty rules. Returns the per-member scenario-generation specification.
+- `draw_scenarios(com, n, seed, quantities, spec)` — Inputs: community, scenario count, seed, uncertain quantities, and optional specification. Returns equiprobable scenarios.
+- `expected_scenario(com)` — Input: community. Returns the deterministic baseline scenario (all multipliers equal to one).
+- `check_scenarios(com, scenarios, spec, tol)` — Inputs: community, scenarios, specification, and tolerance. Checks scenario invariants; returns no value or raises `AssertionError`.
+- `save_scenarios(scenarios, path, seed)` — Inputs: scenarios, output path, and optional seed. Writes scenario parameters/probabilities and returns the path.
+
+### `src/q3_stochastic.py`
+
+- `_ScenarioBlock.__init__(data, m, price, s, **dp_kwargs)` — Inputs: scenario community, shared solver model and prices, scenario index, and DP options. Initializes one scenario block; no return value.
+- `_ScenarioBlock.build()` — Adds one scenario's physical model/KKT constraints; returns the block.
+- `_ScenarioBlock.community_cost()` — Returns the scenario community-cost expression (DKK).
+- `_ScenarioBlock.meter_bill()` — Returns the scenario meter-bill expression (DKK).
+- `_ScenarioBlock.payments()` — Returns members' total payments to the manager (DKK).
+- `StochasticResult.summary()` — Input: stochastic solve results. Returns a text summary with costs/surplus (DKK), exceedance (kWh), solver gap, and runtime (s).
+- `_status(m)` — Input: Gurobi model. Returns its solver status as text.
+- `StochasticDynamicPricingModel.__init__(com, scenarios, name, objective, cvar_alpha, cvar_weight, constraints, epsilon, budget_balance, ir_benchmark, ir_penalty, reg_weight, reg_reference, method, tight_M, M_scale, M_P, M_D, battery_end_soc_value_DKK_per_kWh, mip_gap, time_limit, mip_focus, bb_tol, start_prices, start_box, start_time_limit, start_solution, threads, verbose)` — Inputs: community, scenarios/probabilities, risk and requirement settings, price references (DKK/kWh), solver options, and start solutions. Initializes the model; no return value.
+- `StochasticDynamicPricingModel.build()` — Builds the shared price and scenario models plus risk/requirement constraints; returns the model.
+- `StochasticDynamicPricingModel._chance()` — Returns whether chance constraints are active; Boolean output.
+- `StochasticDynamicPricingModel._add_requirements()` — Adds budget-balance and individual-rationality constraints; no return value.
+- `StochasticDynamicPricingModel._objective()` — Builds the expected-cost or CVaR objective plus penalties (DKK); returns a Gurobi expression.
+- `StochasticDynamicPricingModel.size()` — Returns counts of scenarios, members, variables, constraints, and complementarity pairs.
+- `StochasticDynamicPricingModel.warm_start(prices, time_limit, box)` — Inputs: hourly prices (DKK/kWh), time limit (s), and price range (DKK/kWh). Attempts a feasible solver start; returns success as a Boolean.
+- `StochasticDynamicPricingModel.core_solution()` — Returns the solved core-variable values as a numeric array.
+- `StochasticDynamicPricingModel.set_core_start(values, time_limit)` — Inputs: core-variable values and time limit (s). Attempts to complete a solver start; returns success as a Boolean.
+- `StochasticDynamicPricingModel.solve()` — Solves the stochastic model; returns `StochasticResult` with price, cost, surplus, and scenario/member tables.
+- `StochasticDynamicPricingModel._extract()` — Extracts the solved objective/prices and per-scenario/member results; returns `StochasticResult`.
+- `benchmark_costs(com, scenarios, rule, battery_end_soc_value_DKK_per_kWh)` — Inputs: community, scenarios, benchmark rule, and terminal value (DKK/kWh). Returns each member's benchmark cost (DKK) per scenario.
+- `_member_cost(model, i, x)` — Inputs: solved community model, member index, and primal solution. Returns that member's cost expression (DKK).
+- `respond(com_s, prices, battery_end_soc_value_DKK_per_kWh, tie_break, tol)` — Inputs: scenario community, prices (DKK/kWh), terminal value (DKK/kWh), tie-break rule, and tolerance. Returns the solved member-response model.
+- `evaluate_prices(com, prices, scenarios, benchmark, battery_end_soc_value_DKK_per_kWh, tie_break, label)` — Inputs: community, fixed prices (DKK/kWh), scenarios, optional benchmark costs (DKK), and evaluation options. Returns scenario-level and member-level `DataFrame`s.
+- `risk_metrics(scen, members, alpha, tol)` — Inputs: scenario/member tables, tail share, and tolerance. Returns mean, quantile, CVaR, and risk/requirement metrics (cost/surplus in DKK).
+
+### `src/q3_validation.py`
+
+- `check(name, test, expected, measured, tolerance, ok, detail)` — Inputs: check labels/values and pass status. Prints and returns the validation row.
+- `write_table(rows, folder)` — Inputs: validation rows and output directory. Writes CSV/LaTeX tables and returns both paths.
+- `v1_scenarios(com, n, seed)` — Inputs: community, scenario count, and seed. Runs V1 scenario checks; returns pass status.
+- `main(argv)` — Inputs: optional command-line arguments. Runs Question 3 validation; returns no value.
+
+### `tests/test_cli.py`
+
+- `EntryPointTests.run_cli(*args)` — Inputs: CLI arguments. Runs the entry point and returns its process result.
+- `EntryPointTests.test_help_lists_all_question_and_test_entry_points()` — Checks that help lists the supported entry points; returns no value.
+- `EntryPointTests.test_question_three_run_list_does_not_require_a_solve()` — Checks that listing Question 3 runs does not solve a model; returns no value.
+
+### `tests/test_data_loader.py`
+
+- `CommunityLoaderTests.test_base_community_has_consistent_hourly_data()` — Checks consistency of base-community hourly data; returns no value.
+- `CommunityLoaderTests.test_loading_another_day_updates_profiles_consistently()` — Checks that selecting another day updates profiles consistently; returns no value.
+- `CommunityLoaderTests.test_unknown_community_reports_a_clear_error()` — Checks that an unknown community produces a clear error; returns no value.

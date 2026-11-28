@@ -1,6 +1,6 @@
-"""Question 3: turn the joint preference scenarios of ``src.scenario_generation`` into member data the models can use.
+"""Question 3: turn the joint preference scenarios of ``src.q3_scenario_generation`` into member data the models can use.
 
-``scenario_generation`` returns, for every joint scenario, the scaling parameters theta of every member (and the scaled
+``q3_scenario_generation`` returns, for every joint scenario, the scaling parameters theta of every member (and the scaled
 appliance dicts of the catalogue). The models work on :class:`InputData` objects, so this module applies theta to the
 members of a loaded :class:`CommunityData`:
 
@@ -16,7 +16,7 @@ the scenarios are consistent with the prices, PV and cap of any day d1-d7. The c
 Usage
 -----
 >>> from src.data_loader import load_community
->>> from src import scenario_data as sd
+>>> from src import q3_scenario_data as sd
 >>> com = load_community("base")
 >>> in_sample = sd.draw_scenarios(com, n=5, seed=1)                # list of Scenario, probability 1/5 each
 >>> in_sample[0].members[0].reference_load                         # the member's InputData as scenario 0 sees it
@@ -33,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import scenario_generation as sg
+from . import q3_scenario_generation as sg
 from .data_loader import CommunityData, InputData
 
 
@@ -42,7 +42,7 @@ class Scenario:
     """One joint scenario of the community.
 
     id          : position in its scenario set (0 .. N-1)
-    probability : weight in the expectation (1/N for the equiprobable sets of scenario_generation)
+    probability : weight in the expectation (1/N for the equiprobable sets of q3_scenario_generation)
     theta       : {quantity: {consumer_id: theta}}, quantity in ("profile", "cL"); 1.0 = base value
     index       : {(quantity, consumer_id): k}, the independent draw k this scenario took for every pair (traceability)
     members     : the members' InputData under this scenario, in the order of ``com.members``
@@ -175,6 +175,8 @@ def save_scenarios(scenarios: list[Scenario], path: Path | str, seed: int | None
     """Write one row per (scenario, member): seed, scenario id, probability, consumer, theta of each quantity, index of the
     draw taken, reference energy (kWh) and disutility slope (DKK/kWh). Enough to reproduce and trace every scenario."""
     path = Path(path)
+    if path.suffix.lower() in {".csv", ".txt"} and not path.name.startswith("q3_"):
+        path = path.with_name(f"q3_{path.name}")
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
@@ -190,7 +192,7 @@ def save_scenarios(scenarios: list[Scenario], path: Path | str, seed: int | None
     return path
 
 
-if __name__ == "__main__":   # quick check:  python -m src.scenario_data
+if __name__ == "__main__":   # quick check:  python -m src.q3_scenario_data
     from .data_loader import load_community
 
     com = load_community("base")

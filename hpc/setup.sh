@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time shared Q2/Q3 setup on the DTU HPC interactive node:  bash hpc/setup_q3.sh
+# One-time shared Q2/Q3 setup on the DTU HPC interactive node:  bash hpc/setup.sh
 # Creates the virtual environment and checks that Gurobi finds a licence.
 set -euo pipefail
 cd "$(dirname "$0")/.."

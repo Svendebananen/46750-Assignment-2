@@ -36,7 +36,9 @@ class Results:
     def save(self, folder: Path | str, tag: str = "") -> None:
         folder = Path(folder)
         folder.mkdir(parents=True, exist_ok=True)
-        stem = f"{self.question}{'_' + tag if tag else ''}"
+        mode = self.meta.get("contract_mode")
+        question = "q2" if mode == "dynamic" else "q1"
+        stem = "_".join(part for part in (question, self.question, tag) if part)
         self.hourly.to_csv(folder / f"{stem}_hourly.csv", index_label="hour")
         with open(folder / f"{stem}_summary.txt", "w", encoding="utf-8") as f:
             f.write(f"status    : {self.status}\nobjective : {self.objective:.4f} DKK\n")
@@ -236,7 +238,7 @@ class CommunityModel:
         battery_end_soc_value_DKK_per_kWh: float = 0.0,
     ):
         if contract_mode is ContractMode.DYNAMIC:
-            from .dynamic_pricing_model import DynamicPricingCommunityModel
+            from .q2_model import DynamicPricingCommunityModel
 
             model_class = DynamicPricingCommunityModel
         else:
@@ -638,7 +640,7 @@ class CommunityContractCommunityModel(_CommunityModelBase):
         return gp.quicksum(member_terms) + meter_terms + self._battery_terminal_value()
 def __getattr__(name: str):
     if name in {"DynamicPricingCommunityModel", "internal_price_of_C"}:
-        from . import dynamic_pricing_model
+        from . import q2_model
 
-        return getattr(dynamic_pricing_model, name)
+        return getattr(q2_model, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

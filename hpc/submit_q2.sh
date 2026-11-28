@@ -1,7 +1,7 @@
 #!/bin/bash
 # Submit Question 2 dynamic pricing to LSF:
 #   bash hpc/submit_q2.sh
-# Runs python main.py --DP --ir; each DP variant has the time limit in hpc/config.sh.
+# Runs python main.py --q2-dp --q2-ir; each DP variant has the time limit in hpc/config.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source hpc/config.sh
@@ -21,7 +21,7 @@ set -euo pipefail
 cd "$PWD"
 module load $PYTHON_MODULE $GUROBI_MODULE
 source $VENV/bin/activate
-python main.py --DP --ir --time-limit $Q2_TIME_LIMIT --threads $CORES
+python main.py --q2-dp --q2-ir --q2-time-limit $Q2_TIME_LIMIT --q2-threads $CORES
 JOB
 
 echo "q2_dp_ir: submitted (up to three ${Q2_TIME_LIMIT}s DP solves)"
