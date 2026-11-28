@@ -90,13 +90,13 @@ def main() -> None:
                     help="Question 2: impose budget balance")
     ap.add_argument("--q2-ir", "--ir", dest="ir", action="store_true",
                     help="Question 2: impose soft individual rationality (also adds budget balance)")
-    ap.add_argument("--q2-ir-penalty", "--ir-penalty", dest="ir_penalty", type=float, default=100.0,
+    ap.add_argument("--q2-ir-penalty", "--ir-penalty", dest="ir_penalty", type=float, default=0.6,
                     help="Question 2: penalty per DKK of IR slack")
     ap.add_argument("--q2-threads", "--threads", dest="threads", type=int, default=0,
                     help="Question 2: Gurobi threads (0 = Gurobi default)")
     ap.add_argument("--q2-tight-m", "--tight-M", dest="tight_M", action="store_true",
                     help="Question 2: use one M per complementarity set")
-    ap.add_argument("--q2-m-scale", "--M-scale", dest="M_scale", type=float, default=1.0,
+    ap.add_argument("--q2-m-scale", "--M-scale", dest="M_scale", type=float, default=1.2,
                     help="Question 2: safety factor on the per-set M values")
     ap.add_argument(
         "--q2-mip-focus",
