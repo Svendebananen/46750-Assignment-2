@@ -85,16 +85,16 @@ The jobs keep running after you log out. `bjobs` says `No unfinished job found` 
 ## Question 2: dynamic pricing
 
 Question 2 can use the same HPC environment. After following sections 1-2 above (including `bash hpc/setup_q3.sh`
-on an interactive node), submit the three `--DP --ir` variants as one LSF job:
+on an interactive node), submit the three `--q2-dp --q2-ir` variants as one LSF job:
 
 ```bash
 cd ~/46750-Assignment-2
 bash hpc/submit_q2.sh
 ```
 
-The submitted command is `python main.py --DP --ir` with `--time-limit` and `--threads` set from `hpc/config.sh`.
-`--ir` runs cap-only DP, budget-balanced DP, and budget-balanced DP with individual rationality; the configured
-time limit applies separately to each DP solve. The default is 3600 seconds per solve (up to three hours total)
+The submitted command is `python main.py --q2-dp --q2-ir` with `--q2-time-limit` and `--q2-threads` set from
+`hpc/config.sh`. `--q2-ir` runs cap-only DP, budget-balanced DP, and budget-balanced DP with individual rationality;
+the configured time limit applies separately to each DP solve. The default is 3600 seconds per solve (up to three hours total)
 and a 3:30 job wall time. Adjust `Q2_TIME_LIMIT` or `Q2_WALL` there to suit the queue's limits. Logs are written to
 `hpc/logs/q2_dp_ir_<jobid>.out` and `.err`; result tables, plots, and model outputs go to `results/base/`.
 
@@ -117,7 +117,7 @@ Copy the new runs **from the PC**, then evaluate every run together and draw the
 scp -r <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N3 \
        <DTU-user>@login1.hpc.dtu.dk:46750-Assignment-2/results/base/q3/runs/SDPx_N7 results/base/q3/runs/
 .venv/bin/python -m src.q3_analysis --evaluate
-.venv/bin/python -m src.q3_figures
+.venv/bin/python -m src.q3_plotting
 ```
 
 Evaluating on the PC keeps all runs in one table and one set of figures even when some were solved on the PC

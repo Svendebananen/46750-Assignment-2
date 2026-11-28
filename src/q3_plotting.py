@@ -1,7 +1,7 @@
-"""Question 3: figures 2-4 from the saved runs of ``src.q3_analysis`` (no solving, a few seconds).
+"""Question 3: figures for uncertainty analysis, validation, and saved stochastic runs.
 
-    python -m src.q3_figures                                      # results/base/q3/runs -> results/base/q3/
-    python -m src.q3_figures --runs-dir results/base/q3/runs_benchR --tag benchR
+    python -m src.q3_plotting                                      # results/base/q3/runs -> results/base/q3/
+    python -m src.q3_plotting --runs-dir results/base/q3/runs_benchR --tag benchR
 
 Figure 2  q3_models.png      Do the models deliver what they promise? Realized cost, manager surplus and IR violation
                              on the out-of-sample scenarios (box: 5-95 % whiskers, line: median, o: mean) against
@@ -200,6 +200,83 @@ def fig_scenarios_N(runs: dict, out: Path, tag: str = "") -> Path | None:
                  r"same 100 out-of-sample scenarios)", y=1.0)
     fig.tight_layout()
     path = out / f"q3_scenarios_N{'_' + tag if tag else ''}.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return path
+
+
+def plot_q3_validation(scenarios, base_members, cap, in_model_cost, evaluator_cost, dp_cost: float,
+                       output_dir: Path | str, tag: str = "q3_validation") -> Path:
+    """Plot scenario demand variation and the model/evaluator cost validation."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def net_demand(members):
+        return sum(np.asarray(m.reference_load) - (np.asarray(m.pv_available) if m.has_pv else 0.0) for m in members)
+
+    hours = np.arange(len(cap))
+    nets = np.array([net_demand(s.members) for s in scenarios])
+    base = net_demand(base_members)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 4.8), gridspec_kw={"width_ratios": [1.6, 1]})
+    ax1.fill_between(hours, nets.min(axis=0), nets.max(axis=0), step="mid", color="tab:blue", alpha=0.25,
+                     label=f"Range over the {len(scenarios)} scenarios")
+    for k, n in enumerate(nets):
+        ax1.step(hours, n, where="mid", color="tab:blue", linewidth=0.7, alpha=0.6,
+                 label="One scenario" if k == 0 else None)
+    ax1.step(hours, base, where="mid", color="black", linewidth=1.8, label=r"Base case ($\theta = 1$)")
+    ax1.step(hours, cap, where="mid", color="tab:red", linestyle="--", linewidth=1.5, label="Import cap")
+    ax1.axhline(0, color="black", linewidth=0.6)
+    ax1.set(xlabel="hour", ylabel="kW", xticks=hours[::2],
+            title="(a) Net reference demand of the community (load - available PV)")
+    ax1.legend(fontsize=8, loc="upper left")
+    ax1.grid(alpha=0.3)
+
+    s = np.arange(len(in_model_cost))
+    ax2.bar(s, in_model_cost, 0.6, color="tab:blue", alpha=0.6, label="SDP, in the model")
+    ax2.plot(s, evaluator_cost, "D", color="black", markersize=6, label="Same prices, evaluator")
+    ax2.axhline(dp_cost, color="tab:gray", linestyle="--", linewidth=1.5, label="DP, expected parameters")
+    diff = float(np.max(np.abs(np.asarray(evaluator_cost) - np.asarray(in_model_cost))))
+    lo = min(np.min(in_model_cost), np.min(evaluator_cost), dp_cost)
+    hi = max(np.max(in_model_cost), np.max(evaluator_cost), dp_cost)
+    pad = 0.15 * (hi - lo) + 1.0
+    ax2.set(ylim=(lo - pad, hi + pad), xticks=s, xlabel="in-sample scenario", ylabel="community cost (DKK/day)",
+            title=f"(b) Cost per scenario (max difference {diff:.3f} DKK)")
+    ax2.legend(fontsize=8, loc="lower left")
+    ax2.grid(alpha=0.3, axis="y")
+    fig.tight_layout()
+    path = output_dir / f"{tag}.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    return path
+
+
+def plot_q3_uncertainty_impact(ev, predicted_cost: float, predicted_surplus: float, output_dir: Path | str,
+                               label: str = "DP", tag: str = "q3_uncertainty_impact") -> Path:
+    """Plot realized cost and manager surplus against out-of-sample uncertainty."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dE, exc = ev["dE"].to_numpy(), ev["exceedance_kWh"].to_numpy()
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7.5), sharex=True)
+    vmax = max(float(exc.max()), 1e-3)
+    for ax, col, pred, name in ((ax1, "cost", predicted_cost, "community cost"),
+                                (ax2, "surplus", predicted_surplus, "manager surplus")):
+        y = ev[col].to_numpy()
+        sc = ax.scatter(dE, y, c=exc, cmap="Reds", vmin=0, vmax=vmax, edgecolor="black", linewidth=0.4, s=36, zorder=3)
+        ax.axhline(pred, color="tab:blue", linestyle="--", linewidth=1.5,
+                   label=f"{label} prediction (expected parameters): {pred:.1f} DKK")
+        ax.axhline(y.mean(), color="black", linestyle=":", linewidth=1.5,
+                   label=f"Realized mean over {len(y)} scenarios: {y.mean():.1f} DKK")
+        ax.set_ylabel(f"{name} (DKK/day)")
+        ax.grid(alpha=0.3)
+        ax.legend(fontsize=8, loc="upper left" if col == "cost" else "lower left")
+    ax1.set_title(f"(a) Realized community cost at the posted prices of {label}")
+    ax2.set_title("(b) Manager surplus (payments - meter bill); < 0 is a budget deficit")
+    ax2.axhline(0, color="black", linewidth=0.8)
+    ax2.set_xlabel("community reference energy minus base case (kWh/day): members want more than declared ->")
+    for ax in (ax1, ax2):
+        ax.axvline(0, color="gray", linewidth=0.8)
+    fig.colorbar(sc, ax=(ax1, ax2), pad=0.02, label="cap exceedance (kWh/day)")
+    path = output_dir / f"{tag}.png"
     fig.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(fig)
     return path

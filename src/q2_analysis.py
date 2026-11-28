@@ -11,7 +11,7 @@ from .q2_plotting import (
     DynamicPricingPlotter,
 )
 from .model import CommunityModel, ContractMode
-from .plotting import plot_results
+from .q1_plotting import plot_results
 
 
 def solve_dp(com, args, lam_C, label: str, budget_balance: bool = False, ir_benchmark=None):

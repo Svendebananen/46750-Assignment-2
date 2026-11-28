@@ -62,7 +62,7 @@ if (( ${#submitted[@]} )); then
 module load $PYTHON_MODULE $GUROBI_MODULE
 source $VENV/bin/activate
 python -m src.q3_analysis --evaluate --threads 2
-python -m src.q3_figures
+python -m src.q3_plotting
 JOB
     echo "q3_evaluate: submitted (after all runs)"
 fi

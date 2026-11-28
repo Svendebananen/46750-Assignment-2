@@ -1,6 +1,6 @@
 """Question 1: comparison of R, I and C, contract sensitivity and settlement of C.
 
-The functions here only compute numbers and tables; the figures are drawn in plotting.py and every experiment is
+The functions here only compute numbers and tables; the figures are drawn in q1_plotting.py and every experiment is
 started from main.py using ``python main.py --q1``.
 """
 from __future__ import annotations

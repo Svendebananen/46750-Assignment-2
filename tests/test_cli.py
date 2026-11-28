@@ -22,7 +22,22 @@ class EntryPointTests(unittest.TestCase):
         result = self.run_cli("--help")
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        for option in ("--q1", "--DP", "--q3", "--unit-tests", "--test"):
+        for option in (
+            "--q1",
+            "--q1-r",
+            "--q2-dp",
+            "--q2-ir",
+            "--q2-time-limit",
+            "--q3",
+            "--q3-demo",
+            "--q3-time-scale",
+            "--q3-validation",
+            "--q3-validation-time-limit",
+            "--unit-tests",
+            "--DP",
+            "--time-limit",
+            "--test",
+        ):
             self.assertIn(option, result.stdout)
 
     def test_question_three_run_list_does_not_require_a_solve(self):

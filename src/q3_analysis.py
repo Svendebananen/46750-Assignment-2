@@ -42,7 +42,7 @@ import pandas as pd
 from . import q3_scenario_data as sd
 from .data_loader import load_community
 from .model import CommunityContractCommunityModel, DynamicPricingCommunityModel, internal_price_of_C
-from .plotting import plot_q3_uncertainty_impact
+from .q3_plotting import plot_q3_uncertainty_impact
 from .q3_stochastic import StochasticDynamicPricingModel, benchmark_costs, evaluate_prices, risk_metrics
 
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"

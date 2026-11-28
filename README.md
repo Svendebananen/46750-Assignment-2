@@ -28,19 +28,23 @@ with the package is size-limited and cannot solve the full community models.
 | Question | Command | Purpose |
 |---|---|---|
 | 1 | `python main.py --q1` | Run the comparison, contract sweep, and settlement analyses |
-| 2 | `python main.py --DP --ir` | Run dynamic pricing with budget balance and individual-rationality requirements |
+| 2 | `python main.py --q2-dp --q2-ir` | Run Question 2 dynamic pricing with budget balance and individual-rationality requirements |
 | 3 | `python main.py --q3` | Run the scenario study, stochastic experiments, out-of-sample evaluation, and figures |
 | Tests | `python main.py --unit-tests` | Run fast data-loader and CLI tests without solving models |
-| Validation | `python main.py --test` | Run the unit tests and Question 3 scenario/model checks |
+| Question 3 validation | `python main.py --q3-validation` | Run the unit tests and Question 3 scenario/model checks |
 
 Question 1 experiments can be run separately with `--q1-base`, `--q1-sweep`, or `--q1-settlement`. Question 2 options
-include `--bb`, `--ir`, `--cap-f`, `--sos1`, and `--time-limit`. For an individual dispatch model, use `--R`, `--I`, or
-`--C`.
+use the `--q2-` prefix, for example `--q2-bb`, `--q2-ir`, `--q2-cap-f`, `--q2-sos1`, and `--q2-time-limit`.
+For individual Question 1 dispatch cases, use `--q1-r`, `--q1-i`, or `--q1-c`. The former unprefixed options
+(such as `--DP`, `--ir`, `--time-limit`, `--R`, and `--C`) remain accepted as aliases.
 
 Question 3's full run solves several models and can take hours. Run its stages separately with `--q3-step1`,
-`--q3-runs`, `--q3-evaluate`, or `--q3-figures`; use `--q3-list` to see run status. `--q3-time-scale` scales solver
-time limits, and `--q3-only RUN_NAME ...` selects runs. The full validation takes approximately 15–20 minutes with
-the default solver limits; use `--test --test-only V1 V2` or `--test --test-time-limit 60` for a smaller check.
+`--q3-runs`, `--q3-evaluate`, or `--q3-figures`; use `--q3-list` to see run status. `--q3-time-scale` multiplies
+per-run solver time limits; it is not a total runtime limit. Use it with `--q3` or `--q3-runs`, and use
+`--q3-only RUN_NAME ...` to select runs. The full Question 3 validation takes approximately 15–20 minutes with the
+default solver limits; use `--q3-validation --q3-validation-only V1 V2` or
+`--q3-validation --q3-validation-time-limit 60` to shorten it. The old `--test`, `--test-only`, and
+`--test-time-limit` validation options remain accepted as aliases.
 
 Results and figures are written under `results/<community>/`. The default community is `base`; select another
 community file with `--community NAME`, or load a different day with `--day d1` through `--day d7` for the
@@ -53,8 +57,7 @@ main.py                 Short executable entry point
 src/cli.py              Command-line parsing and dispatch
 src/data_loader.py      Community and input-data loading
 src/model.py            Shared community optimization models
-src/plotting.py         Shared and Question 3 figures
-src/q1_*.py             Question 1 analysis and figures
+src/q1_*.py             Question 1 analysis and figures (shared dispatch plots included)
 src/q2_*.py             Question 2 dynamic-pricing model, analysis, and figures
 src/q3_*.py             Question 3 scenarios, stochastic analysis, validation, and figures
 data/                   Input parameters, profiles, and assignment figures

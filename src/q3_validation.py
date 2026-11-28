@@ -1,8 +1,8 @@
 """Question 3: validation of the scenarios and of the stochastic pricing model SDP.
 
     python -m src.q3_validation                    # all checks, 300 s per MIP (about 15-20 min)
-    python -m src.q3_validation --time-limit 60    # quicker (V5, V6 may stop at a gap)
-    python -m src.q3_validation --only V1 V2 V3 V4 # a subset (about 1 min)
+    python -m src.q3_validation --q3-validation-time-limit 60  # quicker (V5, V6 may stop at a gap)
+    python -m src.q3_validation --q3-validation-only V1 V2 V3 V4 # a subset (about 1 min)
 
 V1  scenarios: probabilities, theta inside [lo, hi] and averaging to the set mean, daily minimum = reference energy,
     indices recover the draws, nested sets (same seed, larger n -> same first draws)
@@ -33,7 +33,7 @@ from . import q3_scenario_data as sd
 from . import q3_scenario_generation as sg
 from .data_loader import load_community
 from .model import CommunityContractCommunityModel, DynamicPricingCommunityModel, internal_price_of_C
-from .plotting import plot_q3_validation
+from .q3_plotting import plot_q3_validation
 from .q3_stochastic import StochasticDynamicPricingModel, evaluate_prices
 
 TOL = 1e-6
@@ -93,10 +93,14 @@ def v1_scenarios(com, n: int, seed: int) -> bool:
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--community", default="base")
-    ap.add_argument("--time-limit", type=float, default=300.0)
-    ap.add_argument("--n", type=int, default=5, help="in-sample scenarios of V5/V6")
-    ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--only", nargs="*", default=None)
+    ap.add_argument("--q3-validation-time-limit", "--time-limit", dest="time_limit", type=float, default=300.0,
+                    help="Question 3 validation: solver time limit in seconds per MIP")
+    ap.add_argument("--q3-validation-n", "--n", dest="n", type=int, default=5,
+                    help="Question 3 validation: in-sample scenarios of V5/V6")
+    ap.add_argument("--q3-validation-seed", "--seed", dest="seed", type=int, default=1,
+                    help="Question 3 validation: random seed")
+    ap.add_argument("--q3-validation-only", "--only", dest="only", nargs="*", default=None,
+                    help="Question 3 validation: select checks V1-V6")
     args = ap.parse_args(argv)
     run = lambda k: args.only is None or k in args.only
     TL = args.time_limit
