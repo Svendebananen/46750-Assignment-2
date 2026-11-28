@@ -1,8 +1,6 @@
 # 46750 — Assignment 2
 
-Optimization experiments for an energy community acting as a flexibility provider. The project includes the community
-data, contract and dispatch models, dynamic pricing, and stochastic pricing experiments for all three assignment
-questions.
+The project includes the community data, contract and dispatch models, dynamic pricing, and stochastic pricing experiments for all three assignment questions.
 
 ## Setup
 
@@ -69,9 +67,9 @@ The shipped data describes one 16-member base community. Input files are in `dat
 tables, model outputs, and plots to `results/`.
 
 ## DTU HPC
-
-For cluster setup, result transfer, and job submission, see the short [HPC guide](hpc/README.md). Question 2 and 3
-have submission scripts in `hpc/`.
+The High performance compute provided by DTU is convenient to use for the large models in question 2 and 3.
+Question 2 and 3 have submission scripts in `hpc/`. 
+For cluster setup, result transfer, and job submission, see the short [HPC guide](hpc/README.md). 
 
 ## Docstring of functions added
 
